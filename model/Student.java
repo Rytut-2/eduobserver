@@ -1,13 +1,5 @@
 package model;
 
-/**
- * Student class representing a student user in the system.
- * Students can view their own observation history.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Handles student-specific data only
- * - Liskov Substitution: Can substitute User without breaking functionality
- */
 public class Student extends User {
     private String grade;
     private String group;

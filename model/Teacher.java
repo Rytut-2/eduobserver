@@ -1,13 +1,5 @@
 package model;
 
-/**
- * Teacher class representing a teacher user in the system.
- * Teachers can create observations for students.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Handles teacher-specific data only
- * - Liskov Substitution: Can substitute User without breaking functionality
- */
 public class Teacher extends User {
     private String department;
 

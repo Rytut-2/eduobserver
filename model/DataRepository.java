@@ -2,15 +2,6 @@ package model;
 
 import java.util.*;
 
-/**
- * DataRepository class for managing data storage in memory.
- * This class follows the Repository pattern and acts as a single
- * point of access for all data operations.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Manages data storage and retrieval only
- * - Dependency Inversion: Controllers depend on this abstraction
- */
 public class DataRepository {
     private Map<String, User> users;
     private Map<String, Observation> observations;

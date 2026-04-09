@@ -33,8 +33,7 @@ public class EduObserver {
         Student s3 = new Student("S003", "Laura Rodriguez", "lrodriguez@student.edu", "11th", "A");
         repository.addUser(s1);
         repository.addUser(s2);
-        repository.3
-    addUser(s3);
+        repository.addUser(s3);
 
         // Create sample coordinator
         Coordinator c1 = new Coordinator("C001", "Dr. Juan Hernandez", "jhernandez@school.edu", "Academic Affairs");

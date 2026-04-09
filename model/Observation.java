@@ -3,14 +3,6 @@ package model;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-/**
- * Observation class representing an observation record in the system.
- * Observations can be Academic or Disciplinary with varying severity.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Manages observation data only
- * - Open/Closed: Can be extended for new observation types
- */
 public class Observation {
     private String id;
     private String teacherId;
