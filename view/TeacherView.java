@@ -3,13 +3,7 @@ package view;
 import model.*;
 import java.util.List;
 
-/**
- * TeacherView class for handling teacher-specific UI.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Handles teacher interface only
- * - Interface Segregation: Only shows teacher-relevant options
- */
+
 public class TeacherView {
 
     public int showMenu() {

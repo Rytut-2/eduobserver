@@ -2,18 +2,12 @@ package view;
 
 import model.*;
 
-/**
- * MainView class for handling the main menu and login interface.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Handles main menu display only
- * - Interface Segregation: Only shows relevant options for each context
- */
+
 public class MainView {
 
     public void showWelcome() {
         ConsoleHelper.printHeader("EduObserver System");
-        ConsoleHelper.printLine("Academic Observation Management System");
+        ConsoleHelper.printLine("Academic Observation ");
         ConsoleHelper.printLine();
     }
 

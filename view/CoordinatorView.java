@@ -3,13 +3,6 @@ package view;
 import model.*;
 import java.util.List;
 
-/**
- * CoordinatorView class for handling coordinator-specific UI.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Handles coordinator interface only
- * - Interface Segregation: Only shows coordinator-relevant options
- */
 public class CoordinatorView {
 
     public int showMenu() {

@@ -3,13 +3,7 @@ package view;
 import model.*;
 import java.util.List;
 
-/**
- * StudentView class for handling student-specific UI.
- *
- * SOLID Principles Applied:
- * - Single Responsibility: Handles student interface only
- * - Interface Segregation: Only shows student-relevant options
- */
+
 public class StudentView {
 
     public int showMenu() {
