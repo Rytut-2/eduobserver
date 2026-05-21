@@ -101,12 +101,10 @@ public class DashboardView extends BorderPane {
             );
         } else if (usuarioActual instanceof Estudiante) {
             Estudiante est = (Estudiante) usuarioActual;
-            // Todos los estudiantes ven Inicio y Mi Historial
             menu.getChildren().addAll(
                     crearBotonMenu("Inicio", "🏠"),
                     crearBotonMenu("Mi Historial", "📋")
             );
-            // Solo representantes ven opción adicional de solicitar revisión
             if (est.isEsRepresentante()) {
                 menu.getChildren().add(crearBotonMenu("Solicitar Revisión", "⚖️"));
             }
@@ -149,8 +147,6 @@ public class DashboardView extends BorderPane {
             case "Historial": cargarHistorial(); break;
             case "Mi Historial": cargarMiHistorial(); break;
             case "Solicitar Revisión": cargarSolicitarRevision(); break;
-            case "Buzón de Sugerencias": cargarBuzon(); break;
-            case "Reportes de Grupo": cargarReporteGrupo(); break;
             default: cargarPanelInicio();
         }
     }
@@ -166,12 +162,16 @@ public class DashboardView extends BorderPane {
         Label bienvenida = new Label("Bienvenido de vuelta, " + usuarioActual.getNombre());
         bienvenida.setFont(Font.font("System", FontWeight.BOLD, 24));
 
-        VBox resumen = crearResumenEstudiantesMasObservaciones();
         VBox calendario = crearCalendario(LocalDate.now().getYear(), LocalDate.now().getMonthValue());
 
-        HBox row = new HBox(20);
-        row.getChildren().addAll(resumen, calendario);
-        panel.getChildren().addAll(bienvenida, row);
+        if (usuarioActual instanceof Coordinador) {
+            VBox resumen = crearResumenEstudiantesMasObservaciones();
+            HBox row = new HBox(20);
+            row.getChildren().addAll(resumen, calendario);
+            panel.getChildren().addAll(bienvenida, row);
+        } else {
+            panel.getChildren().addAll(bienvenida, calendario);
+        }
         contenidoCentral.getChildren().setAll(panel);
     }
 
@@ -289,7 +289,9 @@ public class DashboardView extends BorderPane {
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Gestión de Usuarios");
         GestionUsuariosView gestion = new GestionUsuariosView();
-        stage.setScene(new Scene(gestion, 1000, 600));
+        stage.setScene(new Scene(gestion, 1100, 700));
+        stage.setMinWidth(900);
+        stage.setMinHeight(600);
         stage.initOwner(getScene().getWindow());
         stage.show();
     }
@@ -299,7 +301,9 @@ public class DashboardView extends BorderPane {
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Registrar Observación");
-        stage.setScene(new Scene(registro, 600, 500));
+        stage.setScene(new Scene(registro, 650, 550));
+        stage.setMinWidth(600);
+        stage.setMinHeight(500);
         stage.initOwner(getScene().getWindow());
         stage.show();
     }
@@ -310,7 +314,9 @@ public class DashboardView extends BorderPane {
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Gestionar Peticiones de Revisión");
         GestionPeticionesView view = new GestionPeticionesView();
-        stage.setScene(new Scene(view, 800, 500));
+        stage.setScene(new Scene(view, 950, 650));
+        stage.setMinWidth(800);
+        stage.setMinHeight(550);
         stage.initOwner(getScene().getWindow());
         stage.show();
     }
@@ -321,7 +327,9 @@ public class DashboardView extends BorderPane {
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Reportes de Convivencia");
         ReportesView reportes = new ReportesView();
-        stage.setScene(new Scene(reportes, 800, 600));
+        stage.setScene(new Scene(reportes, 950, 700));
+        stage.setMinWidth(800);
+        stage.setMinHeight(600);
         stage.initOwner(getScene().getWindow());
         stage.show();
     }
@@ -349,7 +357,9 @@ public class DashboardView extends BorderPane {
             stage.initModality(Modality.WINDOW_MODAL);
             stage.setTitle("Mi Historial");
             HistorialView historial = new HistorialView(est);
-            stage.setScene(new Scene(historial, 900, 600));
+            stage.setScene(new Scene(historial, 1000, 700));
+            stage.setMinWidth(800);
+            stage.setMinHeight(600);
             stage.initOwner(getScene().getWindow());
             stage.show();
         }
@@ -364,27 +374,11 @@ public class DashboardView extends BorderPane {
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Solicitar Revisión de Observación");
         SolicitarRevisionView view = new SolicitarRevisionView();
-        stage.setScene(new Scene(view, 500, 400));
+        stage.setScene(new Scene(view, 600, 500));
+        stage.setMinWidth(500);
+        stage.setMinHeight(450);
         stage.initOwner(getScene().getWindow());
         stage.show();
-    }
-
-    private void cargarBuzon() {
-        if (!(usuarioActual instanceof Estudiante) || !((Estudiante) usuarioActual).isEsRepresentante()) {
-            mostrarAlerta("Acceso denegado", "Solo los representantes pueden acceder al buzón.", Alert.AlertType.WARNING);
-            return;
-        }
-        Label label = new Label("Buzón de sugerencias - Pendiente implementar");
-        contenidoCentral.getChildren().setAll(label);
-    }
-
-    private void cargarReporteGrupo() {
-        if (!(usuarioActual instanceof Estudiante) || !((Estudiante) usuarioActual).isEsRepresentante()) {
-            mostrarAlerta("Acceso denegado", "Solo los representantes pueden ver reportes de grupo.", Alert.AlertType.WARNING);
-            return;
-        }
-        Label label = new Label("Reportes de grupo - Pendiente implementar");
-        contenidoCentral.getChildren().setAll(label);
     }
 
     private void cerrarSesion() {
