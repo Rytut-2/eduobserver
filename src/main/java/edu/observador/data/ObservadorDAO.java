@@ -3,13 +3,17 @@ package edu.observador.data;
 
 import edu.observador.model.Estudiante;
 import edu.observador.model.Observacion;
+import edu.observador.model.PeticionRevision;
 import edu.observador.model.enums.RolUsuario;
 import edu.observador.model.Usuario;
+import edu.observador.model.enums.EstadoPeticion;
+
 import java.util.List;
 
 /**
  * Interfaz DAO (Data Access Object) para el sistema EduObservador.
- * Define las operaciones básicas de persistencia para usuarios y observaciones.
+ * Define las operaciones básicas de persistencia para usuarios,
+ * observaciones y peticiones de revisión.
  */
 public interface ObservadorDAO {
 
@@ -84,6 +88,39 @@ public interface ObservadorDAO {
      * @throws DataAccessException si ocurre un error de acceso a datos
      */
     void actualizarObservacion(Observacion observacion) throws DataAccessException;
+
+    // ==================== Operaciones Petición de Revisión ====================
+
+    /**
+     * Guarda una petición de revisión en la base de datos.
+     * @param peticion Petición a guardar
+     * @throws DataAccessException si ocurre un error de acceso a datos
+     */
+    void guardarPeticion(PeticionRevision peticion) throws DataAccessException;
+
+    /**
+     * Lista las peticiones de revisión según su estado.
+     * @param estado Estado de la petición (PENDIENTE, APROBADA, RECHAZADA)
+     * @return Lista de peticiones con ese estado
+     * @throws DataAccessException si ocurre un error de acceso a datos
+     */
+    List<PeticionRevision> listarPeticionesPorEstado(EstadoPeticion estado) throws DataAccessException;
+
+    /**
+     * Lista las peticiones de revisión realizadas sobre observaciones de un estudiante específico.
+     * @param estudianteId ID del estudiante cuyas observaciones fueron impugnadas
+     * @return Lista de peticiones asociadas a las observaciones de ese estudiante
+     * @throws DataAccessException si ocurre un error de acceso a datos
+     */
+    List<PeticionRevision> listarPeticionesPorEstudiante(String estudianteId) throws DataAccessException;
+
+    /**
+     * Actualiza el estado de una petición de revisión.
+     * @param peticionId ID de la petición
+     * @param nuevoEstado Nuevo estado (APROBADA, RECHAZADA)
+     * @throws DataAccessException si ocurre un error de acceso a datos
+     */
+    void actualizarEstadoPeticion(String peticionId, EstadoPeticion nuevoEstado) throws DataAccessException;
 
     // ==================== Operaciones de inicialización ====================
 

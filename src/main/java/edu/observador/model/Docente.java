@@ -9,13 +9,14 @@ import java.util.Objects;
 
 /**
  * Clase que representa a un docente en el sistema.
- * Puede tener cursos asignados, ser docente de grupo (con capacidad de ver
- * historial completo de sus estudiantes) y crear observaciones.
+ * Puede tener una materia principal, cursos asignados, ser docente de grupo
+ * y crear observaciones.
  */
 public class Docente extends Usuario {
 
-    private List<String> cursosAsignados;
-    private String cursoDireccionGrupo;
+    private String materia;                     // Materia que enseña (ej. "Matemáticas")
+    private List<String> cursosAsignados;       // Lista de cursos donde enseña (ej. ["11A", "9B"])
+    private String cursoDireccionGrupo;         // Curso que dirige como docente de grupo (ej. "11A")
     private boolean esDocenteDeGrupo;
     private List<Observacion> observacionesCreadas;
 
@@ -29,6 +30,7 @@ public class Docente extends Usuario {
      */
     public Docente(String id, String nombre, String apellido, String contrasenia) {
         super(id, nombre, apellido, contrasenia, RolUsuario.DOCENTE);
+        this.materia = null;
         this.cursosAsignados = new ArrayList<>();
         this.cursoDireccionGrupo = null;
         this.esDocenteDeGrupo = false;
@@ -88,13 +90,22 @@ public class Docente extends Usuario {
 
     @Override
     public String obtenerInfoEspecifica() {
-        return String.format("Docente - Docente de grupo: %s, Cursos asignados: %s, Curso que dirige: %s",
+        return String.format("Docente - Materia: %s, Docente de grupo: %s, Cursos asignados: %s, Curso que dirige: %s",
+                materia != null ? materia : "No asignada",
                 esDocenteDeGrupo ? "Sí" : "No",
                 cursosAsignados,
                 cursoDireccionGrupo != null ? cursoDireccionGrupo : "Ninguno");
     }
 
     // Getters y Setters
+
+    public String getMateria() {
+        return materia;
+    }
+
+    public void setMateria(String materia) {
+        this.materia = materia;
+    }
 
     public List<String> getCursosAsignados() {
         return new ArrayList<>(cursosAsignados);
@@ -134,17 +145,18 @@ public class Docente extends Usuario {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         Docente docente = (Docente) o;
-        return Objects.equals(cursosAsignados, docente.cursosAsignados);
+        return Objects.equals(materia, docente.materia) &&
+                Objects.equals(cursosAsignados, docente.cursosAsignados);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), cursosAsignados);
+        return Objects.hash(super.hashCode(), materia, cursosAsignados);
     }
 
     @Override
     public String toString() {
-        return String.format("Docente{id='%s', nombre='%s %s', docenteDeGrupo=%s, cursoDir='%s'}",
-                getId(), getNombre(), getApellido(), esDocenteDeGrupo, cursoDireccionGrupo);
+        return String.format("Docente{id='%s', nombre='%s %s', materia='%s', docenteDeGrupo=%s, cursoDir='%s'}",
+                getId(), getNombre(), getApellido(), materia, esDocenteDeGrupo, cursoDireccionGrupo);
     }
 }
