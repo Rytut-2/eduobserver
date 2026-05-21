@@ -22,10 +22,6 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * Vista principal estilo dashboard con menú lateral y contenido dinámico.
- * Se adapta según el rol del usuario logueado (Coordinador, Docente, Estudiante).
- */
 public class DashboardView extends BorderPane {
 
     private final Usuario usuarioActual;
@@ -45,15 +41,12 @@ public class DashboardView extends BorderPane {
     }
 
     private void inicializarUI() {
-        // Barra superior con perfil
         HBox topBar = crearTopBar();
         setTop(topBar);
 
-        // Menú lateral
         menuLateral = crearMenuLateral();
         setLeft(menuLateral);
 
-        // Contenedor central
         contenidoCentral = new StackPane();
         contenidoCentral.setPadding(new Insets(20));
         setCenter(contenidoCentral);
@@ -90,35 +83,32 @@ public class DashboardView extends BorderPane {
         titulo.setPadding(new Insets(0, 0, 20, 10));
         menu.getChildren().add(titulo);
 
-        // Opciones según rol
         if (usuarioActual instanceof Coordinador) {
             menu.getChildren().addAll(
                     crearBotonMenu("Inicio", "🏠"),
                     crearBotonMenu("Analíticas", "📊"),
                     crearBotonMenu("Usuarios", "👥"),
                     crearBotonMenu("Observaciones", "📝"),
+                    crearBotonMenu("Gestionar Peticiones", "📋"),
                     crearBotonMenu("Reportes", "📄")
             );
         } else if (usuarioActual instanceof Docente) {
-            Docente docente = (Docente) usuarioActual;
             menu.getChildren().addAll(
                     crearBotonMenu("Inicio", "🏠"),
                     crearBotonMenu("Mis Estudiantes", "👨‍🎓"),
                     crearBotonMenu("Nueva Observación", "✏️"),
                     crearBotonMenu("Historial", "📜")
             );
-            if (docente.isEsDocenteDeGrupo()) {
-                // Opción extra para ver historial completo (puede añadirse)
-            }
         } else if (usuarioActual instanceof Estudiante) {
             Estudiante est = (Estudiante) usuarioActual;
+            // Todos los estudiantes ven Inicio y Mi Historial
             menu.getChildren().addAll(
                     crearBotonMenu("Inicio", "🏠"),
-                    crearBotonMenu("Mi Historial", "📋"),
-                    crearBotonMenu("Buzón de Sugerencias", "💬")
+                    crearBotonMenu("Mi Historial", "📋")
             );
+            // Solo representantes ven opción adicional de solicitar revisión
             if (est.isEsRepresentante()) {
-                menu.getChildren().add(crearBotonMenu("Reportes de Grupo", "📊"));
+                menu.getChildren().add(crearBotonMenu("Solicitar Revisión", "⚖️"));
             }
         }
 
@@ -152,11 +142,13 @@ public class DashboardView extends BorderPane {
             case "Analíticas": cargarAnaliticas(); break;
             case "Usuarios": cargarGestionUsuarios(); break;
             case "Observaciones": cargarRegistroObservacion(); break;
+            case "Gestionar Peticiones": cargarGestionPeticiones(); break;
             case "Reportes": cargarReportes(); break;
             case "Mis Estudiantes": cargarListaEstudiantes(); break;
             case "Nueva Observación": cargarRegistroObservacion(); break;
             case "Historial": cargarHistorial(); break;
             case "Mi Historial": cargarMiHistorial(); break;
+            case "Solicitar Revisión": cargarSolicitarRevision(); break;
             case "Buzón de Sugerencias": cargarBuzon(); break;
             case "Reportes de Grupo": cargarReporteGrupo(); break;
             default: cargarPanelInicio();
@@ -166,8 +158,6 @@ public class DashboardView extends BorderPane {
     private void cargarPanelPorDefecto() {
         cargarPanelInicio();
     }
-
-    // ==================== PANELES ====================
 
     private void cargarPanelInicio() {
         VBox panel = new VBox(20);
@@ -216,7 +206,7 @@ public class DashboardView extends BorderPane {
         YearMonth yearMonth = YearMonth.of(año, mes);
         LocalDate primerDia = yearMonth.atDay(1);
         int diasEnMes = yearMonth.lengthOfMonth();
-        int diaSemanaInicio = primerDia.getDayOfWeek().getValue(); // lunes=1
+        int diaSemanaInicio = primerDia.getDayOfWeek().getValue();
 
         Label titulo = new Label(yearMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")));
         titulo.setFont(Font.font("System", FontWeight.BOLD, 16));
@@ -314,6 +304,17 @@ public class DashboardView extends BorderPane {
         stage.show();
     }
 
+    private void cargarGestionPeticiones() {
+        if (!(usuarioActual instanceof Coordinador)) return;
+        Stage stage = new Stage();
+        stage.initModality(Modality.WINDOW_MODAL);
+        stage.setTitle("Gestionar Peticiones de Revisión");
+        GestionPeticionesView view = new GestionPeticionesView();
+        stage.setScene(new Scene(view, 800, 500));
+        stage.initOwner(getScene().getWindow());
+        stage.show();
+    }
+
     private void cargarReportes() {
         if (!(usuarioActual instanceof Coordinador)) return;
         Stage stage = new Stage();
@@ -326,15 +327,19 @@ public class DashboardView extends BorderPane {
     }
 
     private void cargarListaEstudiantes() {
-        // Docente: mostrar tabla de estudiantes (simplificado, pendiente implementación completa)
-        Label label = new Label("Lista de estudiantes - Pendiente implementar");
-        contenidoCentral.getChildren().setAll(label);
+        if (!(usuarioActual instanceof Docente)) return;
+        Docente docente = (Docente) usuarioActual;
+        ListaEstudiantesView listaView = new ListaEstudiantesView(docente);
+        contenidoCentral.getChildren().setAll(listaView);
     }
 
     private void cargarHistorial() {
-        // Docente: permitir seleccionar estudiante y ver historial (pendiente)
-        Label label = new Label("Historial de observaciones - Pendiente implementar");
-        contenidoCentral.getChildren().setAll(label);
+        if (usuarioActual instanceof Docente) {
+            cargarListaEstudiantes();
+        } else {
+            Label label = new Label("Historial - Pendiente implementar");
+            contenidoCentral.getChildren().setAll(label);
+        }
     }
 
     private void cargarMiHistorial() {
@@ -350,12 +355,34 @@ public class DashboardView extends BorderPane {
         }
     }
 
+    private void cargarSolicitarRevision() {
+        if (!(usuarioActual instanceof Estudiante) || !((Estudiante) usuarioActual).isEsRepresentante()) {
+            mostrarAlerta("Acceso denegado", "Solo los representantes pueden solicitar revisiones.", Alert.AlertType.WARNING);
+            return;
+        }
+        Stage stage = new Stage();
+        stage.initModality(Modality.WINDOW_MODAL);
+        stage.setTitle("Solicitar Revisión de Observación");
+        SolicitarRevisionView view = new SolicitarRevisionView();
+        stage.setScene(new Scene(view, 500, 400));
+        stage.initOwner(getScene().getWindow());
+        stage.show();
+    }
+
     private void cargarBuzon() {
+        if (!(usuarioActual instanceof Estudiante) || !((Estudiante) usuarioActual).isEsRepresentante()) {
+            mostrarAlerta("Acceso denegado", "Solo los representantes pueden acceder al buzón.", Alert.AlertType.WARNING);
+            return;
+        }
         Label label = new Label("Buzón de sugerencias - Pendiente implementar");
         contenidoCentral.getChildren().setAll(label);
     }
 
     private void cargarReporteGrupo() {
+        if (!(usuarioActual instanceof Estudiante) || !((Estudiante) usuarioActual).isEsRepresentante()) {
+            mostrarAlerta("Acceso denegado", "Solo los representantes pueden ver reportes de grupo.", Alert.AlertType.WARNING);
+            return;
+        }
         Label label = new Label("Reportes de grupo - Pendiente implementar");
         contenidoCentral.getChildren().setAll(label);
     }
@@ -363,5 +390,13 @@ public class DashboardView extends BorderPane {
     private void cerrarSesion() {
         Sesion.cerrarSesion();
         MainApp.volverALogin();
+    }
+
+    private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
+        Alert alert = new Alert(tipo);
+        alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje);
+        alert.showAndWait();
     }
 }

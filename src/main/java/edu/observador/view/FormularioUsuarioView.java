@@ -9,6 +9,10 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * Formulario para crear o editar un usuario.
  * Es utilizado por GestionUsuariosView en un diálogo modal.
@@ -20,7 +24,7 @@ public class FormularioUsuarioView extends VBox {
     private final UsuarioController userController;
 
     private ComboBox<String> cmbTipo;
-    private TextField txtNombre, txtApellido, txtGrado, txtCursos, txtCursoDir;
+    private TextField txtNombre, txtApellido, txtGrado, txtMateria, txtCursos, txtCursoDir;
     private PasswordField txtContrasenia;
     private CheckBox chkRepresentante, chkDocenteGrupo;
     private Button btnGuardar;
@@ -75,6 +79,7 @@ public class FormularioUsuarioView extends VBox {
         grid.add(new Label("Contraseña:"), 0, row);
         grid.add(txtContrasenia, 1, row++);
 
+        // Campos comunes para todos los roles (se ocultarán según tipo)
         txtGrado = new TextField();
         txtGrado.setPromptText("Grado (ej. 10A)");
         grid.add(new Label("Grado:"), 0, row);
@@ -83,9 +88,14 @@ public class FormularioUsuarioView extends VBox {
         chkRepresentante = new CheckBox("Representante de grupo");
         grid.add(chkRepresentante, 1, row++);
 
+        txtMateria = new TextField();
+        txtMateria.setPromptText("Materia que enseña (ej. Matemáticas)");
+        grid.add(new Label("Materia:"), 0, row);
+        grid.add(txtMateria, 1, row++);
+
         txtCursos = new TextField();
-        txtCursos.setPromptText("Cursos asignados, separados por coma");
-        grid.add(new Label("Cursos:"), 0, row);
+        txtCursos.setPromptText("Cursos asignados, separados por coma (ej. 11A,9B)");
+        grid.add(new Label("Cursos asignados:"), 0, row);
         grid.add(txtCursos, 1, row++);
 
         txtCursoDir = new TextField();
@@ -120,8 +130,10 @@ public class FormularioUsuarioView extends VBox {
         String tipo = cmbTipo.getValue();
         boolean esEstudiante = "estudiante".equals(tipo);
         boolean esDocente = "docente".equals(tipo);
+        // Ocultar/mostrar según rol
         txtGrado.setVisible(esEstudiante);
         chkRepresentante.setVisible(esEstudiante);
+        txtMateria.setVisible(esDocente);
         txtCursos.setVisible(esDocente);
         txtCursoDir.setVisible(esDocente);
         chkDocenteGrupo.setVisible(esDocente);
@@ -136,19 +148,27 @@ public class FormularioUsuarioView extends VBox {
             Estudiante e = (Estudiante) usuarioEditar;
             txtGrado.setText(e.getGrado());
             chkRepresentante.setSelected(e.isEsRepresentante());
+            // Ocultar campos de docente
+            txtMateria.setVisible(false);
             txtCursos.setVisible(false);
             txtCursoDir.setVisible(false);
             chkDocenteGrupo.setVisible(false);
         } else if (usuarioEditar instanceof Docente) {
             Docente d = (Docente) usuarioEditar;
-            txtCursos.setText(String.join(",", d.getCursosAsignados()));
+            txtMateria.setText(d.getMateria());
+            // Convertir lista de cursos a texto separado por comas
+            String cursosStr = d.getCursosAsignados().stream().collect(Collectors.joining(", "));
+            txtCursos.setText(cursosStr);
             txtCursoDir.setText(d.getCursoDireccionGrupo());
             chkDocenteGrupo.setSelected(d.isEsDocenteDeGrupo());
+            // Ocultar campos de estudiante
             txtGrado.setVisible(false);
             chkRepresentante.setVisible(false);
         } else {
+            // Coordinador: ocultar todos los campos específicos
             txtGrado.setVisible(false);
             chkRepresentante.setVisible(false);
+            txtMateria.setVisible(false);
             txtCursos.setVisible(false);
             txtCursoDir.setVisible(false);
             chkDocenteGrupo.setVisible(false);
@@ -173,14 +193,34 @@ public class FormularioUsuarioView extends VBox {
                     if (adicional.isEmpty()) throw new IllegalArgumentException("Grado requerido");
                 }
                 Usuario nuevo = userController.registrarNuevoUsuario(tipo, null, nombre, apellido, pass, adicional);
-                // Asignar banderas después de creado
+
+                // Asignar atributos específicos según rol
                 if (nuevo instanceof Estudiante && chkRepresentante.isSelected()) {
                     userController.asignarRepresentante(nuevo.getId(), true);
                 } else if (nuevo instanceof Docente) {
-                    if (chkDocenteGrupo.isSelected()) {
-                        userController.asignarDocenteDeGrupo(nuevo.getId(), true, txtCursoDir.getText().trim());
+                    Docente doc = (Docente) nuevo;
+                    doc.setMateria(txtMateria.getText().trim());
+                    // Parsear cursos asignados (separados por coma)
+                    String cursosText = txtCursos.getText().trim();
+                    if (!cursosText.isEmpty()) {
+                        List<String> cursos = Arrays.stream(cursosText.split("\\s*,\\s*"))
+                                .map(String::trim)
+                                .filter(c -> !c.isEmpty())
+                                .collect(Collectors.toList());
+                        doc.setCursosAsignados(cursos);
                     }
-                    // Asignar cursos (pendiente implementar, si se requiere)
+                    if (chkDocenteGrupo.isSelected()) {
+                        String cursoDir = txtCursoDir.getText().trim();
+                        if (cursoDir.isEmpty()) {
+                            mostrarAlerta("Si es docente de grupo, debe especificar el curso que dirige.");
+                            return;
+                        }
+                        userController.asignarDocenteDeGrupo(doc.getId(), true, cursoDir);
+                    } else {
+                        userController.asignarDocenteDeGrupo(doc.getId(), false, null);
+                    }
+                    // Guardar cambios adicionales (materia, cursos) en el mismo objeto
+                    MainApp.getDAO().guardarUsuario(doc);
                 }
             } else {
                 // Edición
@@ -190,10 +230,33 @@ public class FormularioUsuarioView extends VBox {
                     usuarioEditar.setContrasenia(pass);
                 }
                 MainApp.getDAO().guardarUsuario(usuarioEditar);
+
                 if (usuarioEditar instanceof Estudiante) {
                     userController.asignarRepresentante(usuarioEditar.getId(), chkRepresentante.isSelected());
                 } else if (usuarioEditar instanceof Docente) {
-                    userController.asignarDocenteDeGrupo(usuarioEditar.getId(), chkDocenteGrupo.isSelected(), txtCursoDir.getText().trim());
+                    Docente doc = (Docente) usuarioEditar;
+                    doc.setMateria(txtMateria.getText().trim());
+                    String cursosText = txtCursos.getText().trim();
+                    if (!cursosText.isEmpty()) {
+                        List<String> cursos = Arrays.stream(cursosText.split("\\s*,\\s*"))
+                                .map(String::trim)
+                                .filter(c -> !c.isEmpty())
+                                .collect(Collectors.toList());
+                        doc.setCursosAsignados(cursos);
+                    } else {
+                        doc.setCursosAsignados(List.of());
+                    }
+                    if (chkDocenteGrupo.isSelected()) {
+                        String cursoDir = txtCursoDir.getText().trim();
+                        if (cursoDir.isEmpty()) {
+                            mostrarAlerta("Si es docente de grupo, debe especificar el curso que dirige.");
+                            return;
+                        }
+                        userController.asignarDocenteDeGrupo(doc.getId(), true, cursoDir);
+                    } else {
+                        userController.asignarDocenteDeGrupo(doc.getId(), false, null);
+                    }
+                    MainApp.getDAO().guardarUsuario(doc);
                 }
             }
             mostrarAlerta("Usuario guardado correctamente", Alert.AlertType.INFORMATION);

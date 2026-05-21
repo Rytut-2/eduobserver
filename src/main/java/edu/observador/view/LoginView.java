@@ -102,23 +102,45 @@ public class LoginView extends VBox {
     }
 
     private void mostrarDialogoCambioContrasenia(Usuario usuario) {
-        TextInputDialog dialog = new TextInputDialog();
-        dialog.setTitle("Cambio obligatorio de contraseña");
-        dialog.setHeaderText("Es tu primer ingreso, debes cambiar tu contraseña");
-        dialog.setContentText("Nueva contraseña:");
+        // Primero, mostrar un mensaje informativo
+        Alert alertaInfo = new Alert(Alert.AlertType.INFORMATION);
+        alertaInfo.setTitle("Cambio obligatorio de contraseña");
+        alertaInfo.setHeaderText("Bienvenido, " + usuario.getNombre());
+        alertaInfo.setContentText("Es tu primer ingreso. Debes cambiar tu contraseña antes de continuar.\n\n"
+                + "La nueva contraseña debe tener al menos 4 caracteres.");
+        alertaInfo.initOwner(getScene().getWindow());
 
-        dialog.showAndWait().ifPresent(nuevaPass -> {
-            if (nuevaPass.length() < 4) {
-                mostrarAlerta("Contraseña muy corta", "Mínimo 4 caracteres", Alert.AlertType.ERROR);
-                mostrarDialogoCambioContrasenia(usuario);
-                return;
-            }
-            try {
-                authController.procesarCambioContraseniaObligatorio(nuevaPass);
-                mostrarAlerta("Éxito", "Contraseña cambiada correctamente", Alert.AlertType.INFORMATION);
-                MainApp.cargarDashboard();
-            } catch (Exception e) {
-                mostrarAlerta("Error", e.getMessage(), Alert.AlertType.ERROR);
+        // Cuando el usuario cierre la alerta, mostrar el diálogo para nueva contraseña
+        alertaInfo.showAndWait().ifPresent(response -> {
+            boolean cambioExitoso = false;
+            while (!cambioExitoso) {
+                TextInputDialog dialog = new TextInputDialog();
+                dialog.setTitle("Nueva contraseña");
+                dialog.setHeaderText("Cambio de contraseña obligatorio");
+                dialog.setContentText("Ingrese su nueva contraseña:");
+                dialog.initOwner(getScene().getWindow());
+
+                String nuevaPass = dialog.showAndWait().orElse(null);
+                if (nuevaPass == null) {
+                    // Usuario canceló, no podemos continuar. Volvemos al login.
+                    mostrarAlerta("Cancelado", "Debe cambiar la contraseña para acceder al sistema.", Alert.AlertType.WARNING);
+                    // Limpiar campos y mantener la pantalla de login
+                    return;
+                }
+                if (nuevaPass.length() < 4) {
+                    mostrarAlerta("Contraseña muy corta", "La contraseña debe tener al menos 4 caracteres.", Alert.AlertType.ERROR);
+                    // Repetir el bucle (seguir pidiendo)
+                    continue;
+                }
+                try {
+                    authController.procesarCambioContraseniaObligatorio(nuevaPass);
+                    mostrarAlerta("Éxito", "Contraseña cambiada correctamente. Serás redirigido al dashboard.", Alert.AlertType.INFORMATION);
+                    cambioExitoso = true;
+                    MainApp.cargarDashboard();
+                } catch (Exception e) {
+                    mostrarAlerta("Error", "No se pudo cambiar la contraseña: " + e.getMessage(), Alert.AlertType.ERROR);
+                    // No salimos del bucle; permitimos reintentar
+                }
             }
         });
     }

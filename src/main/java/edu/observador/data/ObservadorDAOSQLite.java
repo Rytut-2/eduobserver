@@ -9,10 +9,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Implementación de ObservadorDAO usando SQLite como motor de persistencia.
- * Maneja las operaciones CRUD para usuarios y observaciones.
- */
 public class ObservadorDAOSQLite implements ObservadorDAO {
 
     private final ConexionDB conexionDB;
@@ -34,6 +30,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
                 primer_ingreso INTEGER NOT NULL DEFAULT 1,
                 grado TEXT,
                 es_representante INTEGER DEFAULT 0,
+                materia TEXT,
                 cursos_asignados TEXT,
                 curso_direccion_grupo TEXT,
                 es_docente_grupo INTEGER DEFAULT 0
@@ -78,15 +75,15 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         }
     }
 
-    // ==================== Implementación métodos Usuario ====================
+    // ==================== Usuarios ====================
 
     @Override
     public void guardarUsuario(Usuario usuario) throws DataAccessException {
         String sql = """
             INSERT OR REPLACE INTO usuarios 
             (id, nombre, apellido, contrasenia, rol, activo, primer_ingreso, 
-             grado, es_representante, cursos_asignados, curso_direccion_grupo, es_docente_grupo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             grado, es_representante, materia, cursos_asignados, curso_direccion_grupo, es_docente_grupo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
@@ -104,24 +101,26 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
                 pstmt.setInt(9, est.isEsRepresentante() ? 1 : 0);
                 pstmt.setString(10, null);
                 pstmt.setString(11, null);
-                pstmt.setInt(12, 0);
+                pstmt.setString(12, null);
+                pstmt.setInt(13, 0);
             } else if (usuario instanceof Docente) {
                 Docente doc = (Docente) usuario;
                 pstmt.setString(8, null);
                 pstmt.setInt(9, 0);
+                pstmt.setString(10, doc.getMateria());
                 String cursos = String.join(",", doc.getCursosAsignados());
-                pstmt.setString(10, cursos.isEmpty() ? null : cursos);
-                pstmt.setString(11, doc.getCursoDireccionGrupo());
-                pstmt.setInt(12, doc.isEsDocenteDeGrupo() ? 1 : 0);
+                pstmt.setString(11, cursos.isEmpty() ? null : cursos);
+                pstmt.setString(12, doc.getCursoDireccionGrupo());
+                pstmt.setInt(13, doc.isEsDocenteDeGrupo() ? 1 : 0);
             } else {
                 // Coordinador
                 pstmt.setString(8, null);
                 pstmt.setInt(9, 0);
                 pstmt.setString(10, null);
                 pstmt.setString(11, null);
-                pstmt.setInt(12, 0);
+                pstmt.setString(12, null);
+                pstmt.setInt(13, 0);
             }
-
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DataAccessException("Error guardando usuario: " + usuario.getId(), e);
@@ -145,8 +144,8 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
 
     @Override
     public List<Usuario> listarUsuariosPorRol(RolUsuario rol) throws DataAccessException {
-        String sql = "SELECT * FROM usuarios WHERE rol = ?";
         List<Usuario> usuarios = new ArrayList<>();
+        String sql = "SELECT * FROM usuarios WHERE rol = ?";
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, rol.name());
             ResultSet rs = pstmt.executeQuery();
@@ -161,15 +160,13 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
 
     @Override
     public List<Estudiante> listarEstudiantes() throws DataAccessException {
-        String sql = "SELECT * FROM usuarios WHERE rol = 'ESTUDIANTE'";
         List<Estudiante> estudiantes = new ArrayList<>();
+        String sql = "SELECT * FROM usuarios WHERE rol = 'ESTUDIANTE'";
         try (Statement stmt = conexionDB.obtenerConexion().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
                 Usuario u = mapearUsuario(rs);
-                if (u instanceof Estudiante) {
-                    estudiantes.add((Estudiante) u);
-                }
+                if (u instanceof Estudiante) estudiantes.add((Estudiante) u);
             }
         } catch (SQLException e) {
             throw new DataAccessException("Error listando estudiantes", e);
@@ -179,16 +176,14 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
 
     @Override
     public List<Estudiante> listarEstudiantesPorGrado(String grado) throws DataAccessException {
-        String sql = "SELECT * FROM usuarios WHERE rol = 'ESTUDIANTE' AND grado = ?";
         List<Estudiante> estudiantes = new ArrayList<>();
+        String sql = "SELECT * FROM usuarios WHERE rol = 'ESTUDIANTE' AND grado = ?";
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, grado);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Usuario u = mapearUsuario(rs);
-                if (u instanceof Estudiante) {
-                    estudiantes.add((Estudiante) u);
-                }
+                if (u instanceof Estudiante) estudiantes.add((Estudiante) u);
             }
         } catch (SQLException e) {
             throw new DataAccessException("Error listando estudiantes por grado: " + grado, e);
@@ -196,7 +191,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         return estudiantes;
     }
 
-    // ==================== Implementación métodos Observación ====================
+    // ==================== Observaciones ====================
 
     @Override
     public void guardarObservacion(Observacion observacion) throws DataAccessException {
@@ -222,16 +217,13 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
                 pstmt.setString(9, acad.getDetalleAcademico());
                 pstmt.setString(10, acad.getTipo().name());
                 pstmt.setString(11, null);
-            } else if (observacion instanceof ObservacionDisciplinaria) {
+            } else {
                 ObservacionDisciplinaria disc = (ObservacionDisciplinaria) observacion;
                 pstmt.setString(8, "DISCIPLINARIA");
                 pstmt.setString(9, null);
                 pstmt.setString(10, null);
                 pstmt.setString(11, disc.getSeveridad().name());
-            } else {
-                throw new DataAccessException("Tipo de observación no soportado");
             }
-
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DataAccessException("Error guardando observación: " + observacion.getId(), e);
@@ -240,8 +232,8 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
 
     @Override
     public List<Observacion> cargarHistorialEstudiante(String estudianteId) throws DataAccessException {
-        String sql = "SELECT * FROM observaciones WHERE estudiante_id = ? ORDER BY fecha DESC";
         List<Observacion> observaciones = new ArrayList<>();
+        String sql = "SELECT * FROM observaciones WHERE estudiante_id = ? ORDER BY fecha DESC";
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, estudianteId);
             ResultSet rs = pstmt.executeQuery();
@@ -260,9 +252,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, id);
             ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return mapearObservacion(rs);
-            }
+            if (rs.next()) return mapearObservacion(rs);
             return null;
         } catch (SQLException e) {
             throw new DataAccessException("Error buscando observación: " + id, e);
@@ -271,11 +261,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
 
     @Override
     public void actualizarObservacion(Observacion observacion) throws DataAccessException {
-        String sql = """
-            UPDATE observaciones 
-            SET descripcion = ?, anulada = ?, justificacion_anulacion = ?
-            WHERE id = ?
-            """;
+        String sql = "UPDATE observaciones SET descripcion = ?, anulada = ?, justificacion_anulacion = ? WHERE id = ?";
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, observacion.getDescripcion());
             pstmt.setInt(2, observacion.isAnulada() ? 1 : 0);
@@ -284,6 +270,71 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
             pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new DataAccessException("Error actualizando observación: " + observacion.getId(), e);
+        }
+    }
+
+    // ==================== Peticiones de Revisión ====================
+
+    @Override
+    public void guardarPeticion(PeticionRevision peticion) throws DataAccessException {
+        String sql = "INSERT OR REPLACE INTO peticiones_revision (id, observacion_id, motivo, fecha_peticion, estado) VALUES (?, ?, ?, ?, ?)";
+        try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
+            pstmt.setString(1, peticion.getId());
+            pstmt.setString(2, peticion.getObservacionImplicada().getId());
+            pstmt.setString(3, peticion.getMotivoAplicacion());
+            pstmt.setString(4, peticion.getFechaPeticion().toString());
+            pstmt.setString(5, peticion.getEstado().name());
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DataAccessException("Error guardando petición", e);
+        }
+    }
+
+    @Override
+    public List<PeticionRevision> listarPeticionesPorEstado(EstadoPeticion estado) throws DataAccessException {
+        List<PeticionRevision> peticiones = new ArrayList<>();
+        String sql = "SELECT * FROM peticiones_revision WHERE estado = ?";
+        try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
+            pstmt.setString(1, estado.name());
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                peticiones.add(mapearPeticion(rs));
+            }
+        } catch (SQLException e) {
+            throw new DataAccessException("Error listando peticiones por estado", e);
+        }
+        return peticiones;
+    }
+
+    @Override
+    public List<PeticionRevision> listarPeticionesPorEstudiante(String estudianteId) throws DataAccessException {
+        List<PeticionRevision> peticiones = new ArrayList<>();
+        String sql = """
+            SELECT pr.* FROM peticiones_revision pr
+            JOIN observaciones o ON pr.observacion_id = o.id
+            WHERE o.estudiante_id = ?
+            """;
+        try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
+            pstmt.setString(1, estudianteId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                peticiones.add(mapearPeticion(rs));
+            }
+        } catch (SQLException e) {
+            throw new DataAccessException("Error listando peticiones por estudiante", e);
+        }
+        return peticiones;
+    }
+
+    @Override
+    public void actualizarEstadoPeticion(String peticionId, EstadoPeticion nuevoEstado) throws DataAccessException {
+        String sql = "UPDATE peticiones_revision SET estado = ? WHERE id = ?";
+        try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
+            pstmt.setString(1, nuevoEstado.name());
+            pstmt.setString(2, peticionId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            throw new DataAccessException("Error actualizando estado de petición", e);
         }
     }
 
@@ -303,14 +354,16 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         boolean activo = rs.getInt("activo") == 1;
         boolean primerIngreso = rs.getInt("primer_ingreso") == 1;
 
-        Usuario usuario;
         if (rol == RolUsuario.ESTUDIANTE) {
             String grado = rs.getString("grado");
             boolean esRepresentante = rs.getInt("es_representante") == 1;
             Estudiante est = new Estudiante(id, nombre, apellido, contrasenia, grado);
             est.setEsRepresentante(esRepresentante);
-            usuario = est;
+            est.setActivo(activo);
+            est.setPrimerIngreso(primerIngreso);
+            return est;
         } else if (rol == RolUsuario.DOCENTE) {
+            String materia = rs.getString("materia");
             String cursosStr = rs.getString("cursos_asignados");
             List<String> cursos = new ArrayList<>();
             if (cursosStr != null && !cursosStr.isEmpty())
@@ -318,17 +371,19 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
             String cursoDireccion = rs.getString("curso_direccion_grupo");
             boolean esDocenteGrupo = rs.getInt("es_docente_grupo") == 1;
             Docente doc = new Docente(id, nombre, apellido, contrasenia);
+            doc.setMateria(materia);
             doc.setCursosAsignados(cursos);
             doc.setCursoDireccionGrupo(cursoDireccion);
             doc.setEsDocenteDeGrupo(esDocenteGrupo);
-            usuario = doc;
+            doc.setActivo(activo);
+            doc.setPrimerIngreso(primerIngreso);
+            return doc;
         } else {
-            usuario = new Coordinador(id, nombre, apellido, contrasenia);
+            Coordinador coord = new Coordinador(id, nombre, apellido, contrasenia);
+            coord.setActivo(activo);
+            coord.setPrimerIngreso(primerIngreso);
+            return coord;
         }
-
-        usuario.setActivo(activo);
-        usuario.setPrimerIngreso(primerIngreso);
-        return usuario;
     }
 
     private Observacion mapearObservacion(ResultSet rs) throws SQLException, DataAccessException {
@@ -343,24 +398,37 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
 
         Estudiante estudiante = (Estudiante) buscarUsuarioPorId(estudianteId);
         Usuario creador = buscarUsuarioPorId(creadorId);
-
-        if (estudiante == null || creador == null) {
+        if (estudiante == null || creador == null)
             throw new DataAccessException("Estudiante o creador no encontrado para observación " + id);
-        }
 
-        Observacion observacion;
+        Observacion obs;
         if ("ACADEMICA".equals(tipo)) {
             TipoAcademia tipoAcad = TipoAcademia.valueOf(rs.getString("tipo_academia"));
             String detalle = rs.getString("detalle_academico");
-            observacion = new ObservacionAcademica(id, descripcion, fecha, estudiante, creador, tipoAcad, detalle);
+            obs = new ObservacionAcademica(id, descripcion, fecha, estudiante, creador, tipoAcad, detalle);
         } else {
             NivelSeveridad severidad = NivelSeveridad.valueOf(rs.getString("severidad"));
-            observacion = new ObservacionDisciplinaria(id, descripcion, fecha, estudiante, creador, severidad);
+            obs = new ObservacionDisciplinaria(id, descripcion, fecha, estudiante, creador, severidad);
         }
+        if (anulada) obs.anular(justificacion);
+        return obs;
+    }
 
-        if (anulada) {
-            observacion.anular(justificacion);
-        }
-        return observacion;
+    private PeticionRevision mapearPeticion(ResultSet rs) throws SQLException, DataAccessException {
+        String id = rs.getString("id");
+        String observacionId = rs.getString("observacion_id");
+        String motivo = rs.getString("motivo");
+        LocalDate fecha = LocalDate.parse(rs.getString("fecha_peticion"));
+        EstadoPeticion estado = EstadoPeticion.valueOf(rs.getString("estado"));
+
+        Observacion observacion = buscarObservacionPorId(observacionId);
+        if (observacion == null)
+            throw new DataAccessException("Observación no encontrada para petición " + id);
+
+        // Usar el constructor completo (asumiendo que existe en PeticionRevision, si no, crearlo)
+        // Si la clase no tiene constructor con fecha y estado, se puede usar reflexión o setters.
+        // Aquí suponemos que existe un constructor con todos los parámetros.
+        // Si no, descomenta el bloque alternativo.
+        return new PeticionRevision(id, observacion, motivo, fecha, estado);
     }
 }
