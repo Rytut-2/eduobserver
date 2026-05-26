@@ -165,36 +165,88 @@ public class DashboardView extends BorderPane {
         VBox calendario = crearCalendario(LocalDate.now().getYear(), LocalDate.now().getMonthValue());
 
         if (usuarioActual instanceof Coordinador) {
-            VBox resumen = crearResumenEstudiantesMasObservaciones();
-            HBox row = new HBox(20);
-            row.getChildren().addAll(resumen, calendario);
-            panel.getChildren().addAll(bienvenida, row);
+            try {
+                int totalUsuarios = userController.getTotalUsuarios();
+                int totalObservaciones = obsController.getTotalObservaciones();
+                int peticionesRevisadas = obsController.getPeticionesRevisadas();
+                int peticionesPendientes = obsController.getPeticionesPendientes();
+
+                HBox tarjetas = new HBox(20);
+                tarjetas.setAlignment(Pos.CENTER);
+                tarjetas.getChildren().addAll(
+                        crearTarjetaEstadistica("👥 Total Usuarios", String.valueOf(totalUsuarios), "#3498db"),
+                        crearTarjetaEstadistica("📝 Total Observaciones", String.valueOf(totalObservaciones), "#2ecc71"),
+                        crearTarjetaEstadistica("✅ Revisadas", String.valueOf(peticionesRevisadas), "#f39c12"),
+                        crearTarjetaEstadistica("⏳ Pendientes", String.valueOf(peticionesPendientes), "#e74c3c")
+                );
+                panel.getChildren().addAll(bienvenida, tarjetas, calendario);
+            } catch (DataAccessException e) {
+                panel.getChildren().add(new Label("Error cargando estadísticas: " + e.getMessage()));
+            }
+        } else if (usuarioActual instanceof Docente) {
+            // Por ahora solo bienvenida y calendario (puede ampliarse)
+            panel.getChildren().addAll(bienvenida, calendario);
+        } else if (usuarioActual instanceof Estudiante) {
+            Estudiante est = (Estudiante) usuarioActual;
+            try {
+                int total = obsController.getTotalObservacionesEstudiante(est.getId(), true);
+                int academicas = obsController.getTotalAcademicasEstudiante(est.getId(), true);
+                int disciplinarias = obsController.getTotalDisciplinariasEstudiante(est.getId(), true);
+
+                HBox tarjetas = new HBox(20);
+                tarjetas.setAlignment(Pos.CENTER);
+                tarjetas.getChildren().addAll(
+                        crearTarjetaEstudiante("📋 Total Observaciones", String.valueOf(total), "#3498db"),
+                        crearTarjetaEstudiante("📖 Académicas", String.valueOf(academicas), "#2ecc71"),
+                        crearTarjetaEstudiante("⚠️ Disciplinarias", String.valueOf(disciplinarias), "#e74c3c")
+                );
+                panel.getChildren().addAll(bienvenida, tarjetas, calendario);
+            } catch (DataAccessException e) {
+                panel.getChildren().add(new Label("Error cargando estadísticas: " + e.getMessage()));
+            }
         } else {
             panel.getChildren().addAll(bienvenida, calendario);
         }
         contenidoCentral.getChildren().setAll(panel);
     }
 
-    private VBox crearResumenEstudiantesMasObservaciones() {
+    private VBox crearTarjetaEstadistica(String titulo, String valor, String color) {
         VBox card = new VBox(10);
-        card.setStyle("-fx-background-color: white; -fx-border-radius: 10; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
-        card.setPrefWidth(300);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(15));
+        card.setStyle("-fx-background-color: white; -fx-border-radius: 10; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        card.setPrefWidth(180);
+        card.setMinWidth(150);
 
-        Label titulo = new Label("📌 Estudiantes con más observaciones");
-        titulo.setFont(Font.font("System", FontWeight.BOLD, 16));
+        Label lblTitulo = new Label(titulo);
+        lblTitulo.setFont(Font.font("System", FontWeight.BOLD, 14));
+        lblTitulo.setStyle("-fx-text-fill: #7f8c8d;");
 
-        ListView<String> lista = new ListView<>();
-        try {
-            List<Estudiante> tops = obsController.obtenerEstudiantesMasObservaciones(5);
-            for (Estudiante e : tops) {
-                int cantidad = obsController.getHistorialEstudiante(e.getId(), true).size();
-                lista.getItems().add(e.getNombreCompleto() + " - " + cantidad + " obs.");
-            }
-        } catch (DataAccessException e) {
-            lista.getItems().add("No se pudieron cargar datos.");
-        }
-        lista.setPrefHeight(200);
-        card.getChildren().addAll(titulo, lista);
+        Label lblValor = new Label(valor);
+        lblValor.setFont(Font.font("System", FontWeight.BOLD, 32));
+        lblValor.setStyle("-fx-text-fill: " + color + ";");
+
+        card.getChildren().addAll(lblTitulo, lblValor);
+        return card;
+    }
+
+    private VBox crearTarjetaEstudiante(String titulo, String valor, String color) {
+        VBox card = new VBox(10);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(15));
+        card.setStyle("-fx-background-color: white; -fx-border-radius: 10; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        card.setPrefWidth(160);
+        card.setMinWidth(140);
+
+        Label lblTitulo = new Label(titulo);
+        lblTitulo.setFont(Font.font("System", FontWeight.BOLD, 14));
+        lblTitulo.setStyle("-fx-text-fill: #7f8c8d;");
+
+        Label lblValor = new Label(valor);
+        lblValor.setFont(Font.font("System", FontWeight.BOLD, 32));
+        lblValor.setStyle("-fx-text-fill: " + color + ";");
+
+        card.getChildren().addAll(lblTitulo, lblValor);
         return card;
     }
 
@@ -254,33 +306,44 @@ public class DashboardView extends BorderPane {
         titulo.setFont(Font.font("System", FontWeight.BOLD, 20));
 
         try {
-            List<Estudiante> estudiantes = userController.listarEstudiantes();
-            int total = estudiantes.size();
-            int rojos = 0, amarillos = 0, verdes = 0;
-            for (Estudiante e : estudiantes) {
-                String nivel = e.calcularNivelAlerta();
-                switch (nivel) {
-                    case "Rojo": rojos++; break;
-                    case "Amarillo": amarillos++; break;
-                    default: verdes++;
-                }
-            }
-            GridPane stats = new GridPane();
-            stats.setHgap(20);
-            stats.setVgap(10);
-            stats.add(new Label("Total estudiantes:"), 0, 0);
-            stats.add(new Label(String.valueOf(total)), 1, 0);
-            stats.add(new Label("Alerta Roja:"), 0, 1);
-            stats.add(new Label(String.valueOf(rojos)), 1, 1);
-            stats.add(new Label("Alerta Amarilla:"), 0, 2);
-            stats.add(new Label(String.valueOf(amarillos)), 1, 2);
-            stats.add(new Label("Alerta Verde:"), 0, 3);
-            stats.add(new Label(String.valueOf(verdes)), 1, 3);
-            panel.getChildren().addAll(titulo, stats);
+            int totalEstudiantes = userController.getTotalEstudiantes();
+            int totalDocentes = userController.getTotalDocentes();
+            int totalAcademicas = obsController.getTotalObservacionesAcademicas();
+            int totalDisciplinarias = obsController.getTotalObservacionesDisciplinarias();
+
+            HBox tarjetas = new HBox(20);
+            tarjetas.setAlignment(Pos.CENTER);
+            tarjetas.getChildren().addAll(
+                    crearTarjetaAnalitica("Total Estudiantes", String.valueOf(totalEstudiantes), "#3498db"),
+                    crearTarjetaAnalitica("Total Docentes", String.valueOf(totalDocentes), "#27ae60"),
+                    crearTarjetaAnalitica("Observaciones Académicas", String.valueOf(totalAcademicas), "#2ecc71"),
+                    crearTarjetaAnalitica("Observaciones Disciplinarias", String.valueOf(totalDisciplinarias), "#e74c3c")
+            );
+            panel.getChildren().addAll(titulo, tarjetas);
         } catch (DataAccessException e) {
-            panel.getChildren().add(new Label("Error cargando datos"));
+            panel.getChildren().add(new Label("Error cargando analíticas: " + e.getMessage()));
         }
         contenidoCentral.getChildren().setAll(panel);
+    }
+
+    private VBox crearTarjetaAnalitica(String titulo, String valor, String color) {
+        VBox card = new VBox(10);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(15));
+        card.setStyle("-fx-background-color: white; -fx-border-radius: 10; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        card.setPrefWidth(200);
+        card.setMinWidth(160);
+
+        Label lblTitulo = new Label(titulo);
+        lblTitulo.setFont(Font.font("System", FontWeight.BOLD, 14));
+        lblTitulo.setStyle("-fx-text-fill: #7f8c8d;");
+
+        Label lblValor = new Label(valor);
+        lblValor.setFont(Font.font("System", FontWeight.BOLD, 32));
+        lblValor.setStyle("-fx-text-fill: " + color + ";");
+
+        card.getChildren().addAll(lblTitulo, lblValor);
+        return card;
     }
 
     private void cargarGestionUsuarios() {

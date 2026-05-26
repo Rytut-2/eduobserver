@@ -46,7 +46,7 @@ public class MainApp extends Application {
 
     public static void cargarDashboard() {
         DashboardView dashboard = new DashboardView();
-        Scene scene = new Scene(dashboard, 1100, 700);  // Tamaño original
+        Scene scene = new Scene(dashboard, 1100, 700);
         primaryStage.setScene(scene);
         primaryStage.setTitle("EduObservador - Dashboard");
         primaryStage.setResizable(true);

@@ -1,38 +1,84 @@
+// Archivo: src/edu/observador/view/SolicitarRevisionView.java
 package edu.observador.view;
 
 import edu.observador.MainApp;
 import edu.observador.controller.ObservacionController;
+import edu.observador.controller.UsuarioController;
+import edu.observador.data.DataAccessException;
+import edu.observador.model.Estudiante;
 import edu.observador.model.Observacion;
 import edu.observador.view.controllers.Sesion;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class SolicitarRevisionView extends VBox {
-    private ComboBox<Observacion> cmbObservacion;
+
+    private ComboBox<ObservacionItem> cmbObservacion;
     private TextArea txtMotivo;
     private Button btnEnviar;
+    private Button btnCancelar;
     private ObservacionController obsController;
+    private UsuarioController userController;
+    private Estudiante representante;
+
+    // Clase interna para mostrar observación con información legible
+    private static class ObservacionItem {
+        private final Observacion observacion;
+        private final String displayText;
+
+        public ObservacionItem(Observacion observacion, String estudianteNombre) {
+            this.observacion = observacion;
+            // Truncar descripción si es muy larga
+            String descCorta = observacion.getDescripcion().length() > 50 ?
+                    observacion.getDescripcion().substring(0, 47) + "..." :
+                    observacion.getDescripcion();
+            this.displayText = estudianteNombre + " - " + descCorta;
+        }
+
+        public Observacion getObservacion() { return observacion; }
+
+        @Override
+        public String toString() { return displayText; }
+    }
 
     public SolicitarRevisionView() {
-        obsController = new ObservacionController(MainApp.getDAO());
+        this.obsController = new ObservacionController(MainApp.getDAO());
+        this.userController = new UsuarioController(MainApp.getDAO());
+        this.representante = (Estudiante) Sesion.getUsuarioActual();
         inicializar();
+        cargarObservaciones();
     }
 
     private void inicializar() {
         setSpacing(10);
         setPadding(new Insets(20));
+        setStyle("-fx-background-color: white;");
+
         cmbObservacion = new ComboBox<>();
-        cargarObservaciones();
-        cmbObservacion.setPromptText("Seleccione observación a impugnar");
+        cmbObservacion.setPromptText("Seleccione la observación a impugnar");
+        cmbObservacion.setPrefWidth(450);
+
         txtMotivo = new TextArea();
-        txtMotivo.setPromptText("Motivo de la solicitud de revisión");
-        txtMotivo.setPrefRowCount(3);
+        txtMotivo.setPromptText("Explique detalladamente el motivo de la solicitud de revisión");
+        txtMotivo.setPrefRowCount(4);
+        txtMotivo.setWrapText(true);
+
         btnEnviar = new Button("Enviar Solicitud");
-        btnEnviar.setOnAction(e -> enviar());
+        btnCancelar = new Button("Cancelar");
+        btnCancelar.setOnAction(e -> ((Stage) getScene().getWindow()).close());
+
+        HBox buttonBar = new HBox(10);
+        buttonBar.setAlignment(Pos.CENTER_RIGHT);
+        buttonBar.getChildren().addAll(btnEnviar, btnCancelar);
 
         GridPane grid = new GridPane();
         grid.setHgap(10);
@@ -41,18 +87,69 @@ public class SolicitarRevisionView extends VBox {
         grid.add(cmbObservacion, 1, 0);
         grid.add(new Label("Motivo:"), 0, 1);
         grid.add(txtMotivo, 1, 1);
-        grid.add(btnEnviar, 1, 2);
+        grid.add(buttonBar, 1, 2);
+
         getChildren().add(grid);
+        btnEnviar.setOnAction(e -> enviarSolicitud());
     }
 
     private void cargarObservaciones() {
-        // Cargar observaciones del estudiante que sean activas (no anuladas)
-        // Aquí necesitaríamos un método en ObservacionController para obtener observaciones del estudiante actual (representante)
-        // Por simplicidad, se puede obtener todas las observaciones del estudiante (de su grado)
-        // Implementación pendiente.
+        try {
+            String grado = representante.getGrado();
+            if (grado == null || grado.isEmpty()) {
+                mostrarAlerta("Error", "El representante no tiene un grado asignado.", Alert.AlertType.ERROR);
+                return;
+            }
+
+            List<Estudiante> estudiantes = userController.listarEstudiantesPorGrado(grado);
+            List<ObservacionItem> items = new ArrayList<>();
+
+            for (Estudiante e : estudiantes) {
+                // Obtener observaciones activas (no anuladas) del estudiante
+                List<Observacion> observaciones = obsController.getHistorialEstudiante(e.getId(), true);
+                for (Observacion obs : observaciones) {
+                    items.add(new ObservacionItem(obs, e.getNombreCompleto()));
+                }
+            }
+
+            if (items.isEmpty()) {
+                cmbObservacion.setDisable(true);
+                btnEnviar.setDisable(true);
+                mostrarAlerta("Sin observaciones", "No hay observaciones activas en su grado para solicitar revisión.", Alert.AlertType.WARNING);
+            } else {
+                cmbObservacion.setItems(FXCollections.observableArrayList(items));
+            }
+        } catch (DataAccessException e) {
+            mostrarAlerta("Error", "No se pudieron cargar las observaciones: " + e.getMessage(), Alert.AlertType.ERROR);
+        }
     }
 
-    private void enviar() {
-        // Validar y llamar a obsController.crearPeticionRevision
+    private void enviarSolicitud() {
+        ObservacionItem selected = cmbObservacion.getValue();
+        if (selected == null) {
+            mostrarAlerta("Selección requerida", "Debe seleccionar una observación.", Alert.AlertType.WARNING);
+            return;
+        }
+        String motivo = txtMotivo.getText();
+        if (motivo == null || motivo.trim().isEmpty()) {
+            mostrarAlerta("Motivo requerido", "Debe ingresar un motivo para la revisión.", Alert.AlertType.WARNING);
+            return;
+        }
+
+        try {
+            obsController.crearPeticionRevision(selected.getObservacion().getId(), motivo, representante);
+            mostrarAlerta("Solicitud enviada", "Su solicitud de revisión ha sido registrada. El coordinador la evaluará.", Alert.AlertType.INFORMATION);
+            ((Stage) getScene().getWindow()).close();
+        } catch (Exception ex) {
+            mostrarAlerta("Error", "No se pudo enviar la solicitud: " + ex.getMessage(), Alert.AlertType.ERROR);
+        }
+    }
+
+    private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
+        Alert alert = new Alert(tipo);
+        alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje);
+        alert.showAndWait();
     }
 }

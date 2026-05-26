@@ -1,13 +1,15 @@
+// Archivo: src/edu/observador/view/GestionPeticionesView.java
 package edu.observador.view;
 
 import edu.observador.MainApp;
 import edu.observador.controller.ObservacionController;
+import edu.observador.data.DataAccessException;
 import edu.observador.model.PeticionRevision;
 import edu.observador.model.enums.EstadoPeticion;
 import edu.observador.view.controllers.Sesion;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
@@ -15,47 +17,89 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.util.List;
+
 public class GestionPeticionesView extends BorderPane {
+
+    private final ObservacionController obsController;
     private TableView<PeticionRevision> tabla;
-    private ObservacionController obsController;
+    private Button btnRefrescar;
+    private Button btnCerrar;
 
     public GestionPeticionesView() {
-        obsController = new ObservacionController(MainApp.getDAO());
+        this.obsController = new ObservacionController(MainApp.getDAO());
         inicializarUI();
         cargarPeticiones();
     }
 
     private void inicializarUI() {
+        setPadding(new Insets(10));
+        setStyle("-fx-background-color: #f4f7fc;");
+
+        // Barra superior con botón refrescar
+        btnRefrescar = new Button("Refrescar");
+        btnRefrescar.setOnAction(e -> cargarPeticiones());
+        HBox topBar = new HBox(10);
+        topBar.setPadding(new Insets(0, 0, 10, 0));
+        topBar.getChildren().add(btnRefrescar);
+
+        // Tabla
         tabla = new TableView<>();
+        tabla.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
         TableColumn<PeticionRevision, String> colId = new TableColumn<>("ID");
         colId.setCellValueFactory(new PropertyValueFactory<>("id"));
+
         TableColumn<PeticionRevision, String> colObservacion = new TableColumn<>("Observación ID");
-        colObservacion.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getObservacionImplicada().getId()));
+        colObservacion.setCellValueFactory(cellData ->
+                new javafx.beans.property.SimpleStringProperty(cellData.getValue().getObservacionImplicada().getId()));
+
         TableColumn<PeticionRevision, String> colMotivo = new TableColumn<>("Motivo");
         colMotivo.setCellValueFactory(new PropertyValueFactory<>("motivoAplicacion"));
-        TableColumn<PeticionRevision, String> colEstado = new TableColumn<>("Estado");
+
+        TableColumn<PeticionRevision, String> colFecha = new TableColumn<>("Fecha");
+        colFecha.setCellValueFactory(new PropertyValueFactory<>("fechaPeticion"));
+
+        TableColumn<PeticionRevision, EstadoPeticion> colEstado = new TableColumn<>("Estado");
         colEstado.setCellValueFactory(new PropertyValueFactory<>("estado"));
+
         TableColumn<PeticionRevision, Void> colAcciones = new TableColumn<>("Acciones");
         colAcciones.setCellFactory(param -> new TableCell<>() {
             private final Button btnAprobar = new Button("Aprobar");
             private final Button btnRechazar = new Button("Rechazar");
             private final HBox pane = new HBox(5, btnAprobar, btnRechazar);
+
             {
                 btnAprobar.setOnAction(e -> {
                     PeticionRevision p = getTableView().getItems().get(getIndex());
+                    if (p.getEstado() != EstadoPeticion.PENDIENTE) {
+                        mostrarAlerta("Error", "Solo se pueden gestionar peticiones pendientes.", Alert.AlertType.ERROR);
+                        return;
+                    }
                     try {
                         obsController.aprobarPeticion(p.getId(), Sesion.getUsuarioActual());
                         cargarPeticiones();
-                    } catch (Exception ex) { mostrarAlerta("Error", ex.getMessage()); }
+                        mostrarAlerta("Éxito", "Petición aprobada.", Alert.AlertType.INFORMATION);
+                    } catch (Exception ex) {
+                        mostrarAlerta("Error", ex.getMessage(), Alert.AlertType.ERROR);
+                    }
                 });
                 btnRechazar.setOnAction(e -> {
                     PeticionRevision p = getTableView().getItems().get(getIndex());
+                    if (p.getEstado() != EstadoPeticion.PENDIENTE) {
+                        mostrarAlerta("Error", "Solo se pueden gestionar peticiones pendientes.", Alert.AlertType.ERROR);
+                        return;
+                    }
                     try {
                         obsController.rechazarPeticion(p.getId(), Sesion.getUsuarioActual());
                         cargarPeticiones();
-                    } catch (Exception ex) { mostrarAlerta("Error", ex.getMessage()); }
+                        mostrarAlerta("Éxito", "Petición rechazada.", Alert.AlertType.INFORMATION);
+                    } catch (Exception ex) {
+                        mostrarAlerta("Error", ex.getMessage(), Alert.AlertType.ERROR);
+                    }
                 });
             }
+
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
@@ -63,21 +107,38 @@ public class GestionPeticionesView extends BorderPane {
                 else setGraphic(pane);
             }
         });
-        tabla.getColumns().addAll(colId, colObservacion, colMotivo, colEstado, colAcciones);
-        setCenter(tabla);
+
+        tabla.getColumns().addAll(colId, colObservacion, colMotivo, colFecha, colEstado, colAcciones);
+
+        // Botón cerrar en la parte inferior
+        btnCerrar = new Button("Cerrar");
+        btnCerrar.setOnAction(e -> ((Stage) getScene().getWindow()).close());
+        HBox bottomBar = new HBox(10);
+        bottomBar.setAlignment(Pos.CENTER_RIGHT);
+        bottomBar.setPadding(new Insets(10, 0, 0, 0));
+        bottomBar.getChildren().add(btnCerrar);
+
+        VBox center = new VBox(10, topBar, tabla, bottomBar);
+        setCenter(center);
     }
 
     private void cargarPeticiones() {
         try {
-            tabla.setItems(FXCollections.observableArrayList(obsController.listarPeticionesPendientes()));
-        } catch (Exception e) {
-            mostrarAlerta("Error", e.getMessage());
+            List<PeticionRevision> peticiones = obsController.listarPeticionesPendientes();
+            tabla.setItems(FXCollections.observableArrayList(peticiones));
+            if (peticiones.isEmpty()) {
+                tabla.setPlaceholder(new Label("No hay peticiones pendientes."));
+            }
+        } catch (DataAccessException e) {
+            mostrarAlerta("Error", "No se pudieron cargar las peticiones: " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
-    private void mostrarAlerta(String titulo, String mensaje) {
-        Alert alert = new Alert(Alert.AlertType.ERROR, mensaje);
+    private void mostrarAlerta(String titulo, String mensaje, Alert.AlertType tipo) {
+        Alert alert = new Alert(tipo);
         alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje);
         alert.showAndWait();
     }
 }

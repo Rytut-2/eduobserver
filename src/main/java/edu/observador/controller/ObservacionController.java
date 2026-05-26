@@ -11,9 +11,6 @@ import edu.observador.model.enums.TipoAcademia;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Controlador para la gestión de observaciones y peticiones de revisión.
- */
 public class ObservacionController {
 
     private final ObservadorDAO observacionDAO;
@@ -22,7 +19,7 @@ public class ObservacionController {
         this.observacionDAO = dao;
     }
 
-    // ==================== Observaciones ====================
+    // ==================== Registro de observaciones ====================
 
     public Observacion registrarDisciplinaria(String estudianteId, String creadorId,
                                               String descripcion, NivelSeveridad severidad)
@@ -80,6 +77,8 @@ public class ObservacionController {
         observacionDAO.actualizarObservacion(obs);
     }
 
+    // ==================== Consulta de historial y alertas ====================
+
     public List<Observacion> getHistorialEstudiante(String estudianteId, boolean soloActivas)
             throws DataAccessException {
         List<Observacion> todas = observacionDAO.cargarHistorialEstudiante(estudianteId);
@@ -124,56 +123,91 @@ public class ObservacionController {
         return coord.generarReporteGeneral(estudiantes);
     }
 
-    // ==================== Peticiones de Revisión ====================
+    // ==================== Estadísticas para tarjetas (Coordinador) ====================
 
-    /**
-     * Crea una petición de revisión sobre una observación.
-     * Solo puede ser usado por un estudiante representante.
-     */
+    public int getTotalObservaciones() throws DataAccessException {
+        List<Estudiante> estudiantes = observacionDAO.listarEstudiantes();
+        int total = 0;
+        for (Estudiante e : estudiantes) {
+            total += observacionDAO.cargarHistorialEstudiante(e.getId()).size();
+        }
+        return total;
+    }
+
+    public int getTotalObservacionesAcademicas() throws DataAccessException {
+        List<Estudiante> estudiantes = observacionDAO.listarEstudiantes();
+        int total = 0;
+        for (Estudiante e : estudiantes) {
+            total += (int) observacionDAO.cargarHistorialEstudiante(e.getId()).stream()
+                    .filter(o -> o instanceof ObservacionAcademica).count();
+        }
+        return total;
+    }
+
+    public int getTotalObservacionesDisciplinarias() throws DataAccessException {
+        List<Estudiante> estudiantes = observacionDAO.listarEstudiantes();
+        int total = 0;
+        for (Estudiante e : estudiantes) {
+            total += (int) observacionDAO.cargarHistorialEstudiante(e.getId()).stream()
+                    .filter(o -> o instanceof ObservacionDisciplinaria).count();
+        }
+        return total;
+    }
+
+    // ==================== Estadísticas para estudiante ====================
+
+    public int getTotalObservacionesEstudiante(String estudianteId, boolean soloActivas) throws DataAccessException {
+        return getHistorialEstudiante(estudianteId, soloActivas).size();
+    }
+
+    public int getTotalAcademicasEstudiante(String estudianteId, boolean soloActivas) throws DataAccessException {
+        return (int) getHistorialEstudiante(estudianteId, soloActivas).stream()
+                .filter(o -> o instanceof ObservacionAcademica).count();
+    }
+
+    public int getTotalDisciplinariasEstudiante(String estudianteId, boolean soloActivas) throws DataAccessException {
+        return (int) getHistorialEstudiante(estudianteId, soloActivas).stream()
+                .filter(o -> o instanceof ObservacionDisciplinaria).count();
+    }
+
+    // ==================== Peticiones de revisión ====================
+
     public void crearPeticionRevision(String observacionId, String motivo, Usuario solicitante)
             throws DataAccessException {
         if (!(solicitante instanceof Estudiante) || !((Estudiante) solicitante).isEsRepresentante()) {
             throw new SecurityException("Solo los representantes pueden solicitar revisiones");
         }
         Observacion obs = observacionDAO.buscarObservacionPorId(observacionId);
-        if (obs == null) {
-            throw new IllegalArgumentException("Observación no encontrada");
-        }
-        // Opcional: verificar que la observación pertenezca a un estudiante del mismo grado que el representante
+        if (obs == null) throw new IllegalArgumentException("Observación no encontrada");
         PeticionRevision peticion = new PeticionRevision(null, obs, motivo);
         observacionDAO.guardarPeticion(peticion);
     }
 
-    /**
-     * Lista todas las peticiones pendientes (para coordinador).
-     */
     public List<PeticionRevision> listarPeticionesPendientes() throws DataAccessException {
         return observacionDAO.listarPeticionesPorEstado(EstadoPeticion.PENDIENTE);
     }
 
-    /**
-     * Aprueba una petición de revisión. Solo coordinador.
-     * Opcionalmente, se puede anular la observación asociada.
-     */
     public void aprobarPeticion(String peticionId, Usuario coordinador) throws DataAccessException {
         if (!(coordinador instanceof Coordinador)) {
             throw new SecurityException("Solo el coordinador puede aprobar peticiones");
         }
-        // Obtener la petición (necesitaríamos un método buscarPeticionPorId, aquí simplificamos)
-        // Por ahora, solo actualizamos estado. Para anular la observación, se requiere cargar la petición.
         observacionDAO.actualizarEstadoPeticion(peticionId, EstadoPeticion.APROBADA);
-        // Opcional: buscar la petición y anular la observación
-        // PeticionRevision p = observacionDAO.buscarPeticionPorId(peticionId);
-        // if (p != null) anularObservacion(p.getObservacionImplicada().getId(), "Aprobada por revisión", coordinador);
+        // Opcional: anular la observación automáticamente
     }
 
-    /**
-     * Rechaza una petición de revisión. Solo coordinador.
-     */
     public void rechazarPeticion(String peticionId, Usuario coordinador) throws DataAccessException {
         if (!(coordinador instanceof Coordinador)) {
             throw new SecurityException("Solo el coordinador puede rechazar peticiones");
         }
         observacionDAO.actualizarEstadoPeticion(peticionId, EstadoPeticion.RECHAZADA);
+    }
+
+    public int getPeticionesRevisadas() throws DataAccessException {
+        return observacionDAO.listarPeticionesPorEstado(EstadoPeticion.APROBADA).size() +
+                observacionDAO.listarPeticionesPorEstado(EstadoPeticion.RECHAZADA).size();
+    }
+
+    public int getPeticionesPendientes() throws DataAccessException {
+        return observacionDAO.listarPeticionesPorEstado(EstadoPeticion.PENDIENTE).size();
     }
 }

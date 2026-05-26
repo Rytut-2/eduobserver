@@ -6,9 +6,9 @@ import edu.observador.controller.UsuarioController;
 import edu.observador.data.DataAccessException;
 import edu.observador.model.*;
 import edu.observador.model.enums.RolUsuario;
-import edu.observador.view.controllers.Sesion;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -21,10 +21,6 @@ import javafx.stage.Stage;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Vista para gestionar usuarios (solo coordinador).
- * Permite listar, crear, editar, deshabilitar y asignar roles especiales.
- */
 public class GestionUsuariosView extends BorderPane {
 
     private final UsuarioController userController;
@@ -41,7 +37,7 @@ public class GestionUsuariosView extends BorderPane {
         setPadding(new Insets(10));
         setStyle("-fx-background-color: #f4f7fc;");
 
-        // Barra superior
+        // Barra superior con botones
         HBox topBar = new HBox(10);
         topBar.setPadding(new Insets(0, 0, 10, 0));
         Button btnCrear = new Button("+ Nuevo Usuario");
@@ -72,15 +68,15 @@ public class GestionUsuariosView extends BorderPane {
         TableColumn<Usuario, Void> colAcciones = new TableColumn<>("Acciones");
         colAcciones.setCellFactory(param -> new TableCell<>() {
             private final Button btnEditar = new Button("Editar");
-            private final Button btnDeshabilitar = new Button("Deshabilitar");
-            private final HBox pane = new HBox(5, btnEditar, btnDeshabilitar);
+            private final Button btnToggle = new Button();
+            private final HBox pane = new HBox(5, btnEditar, btnToggle);
 
             {
                 btnEditar.setOnAction(e -> {
                     Usuario u = getTableView().getItems().get(getIndex());
                     mostrarFormularioUsuario(u);
                 });
-                btnDeshabilitar.setOnAction(e -> {
+                btnToggle.setOnAction(e -> {
                     Usuario u = getTableView().getItems().get(getIndex());
                     alternarEstadoActivo(u);
                 });
@@ -89,14 +85,28 @@ public class GestionUsuariosView extends BorderPane {
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) setGraphic(null);
-                else setGraphic(pane);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    Usuario u = getTableView().getItems().get(getIndex());
+                    boolean activo = u.isActivo();
+                    btnToggle.setText(activo ? "Deshabilitar" : "Activar");
+                    setGraphic(pane);
+                }
             }
         });
 
         tablaUsuarios.getColumns().addAll(colId, colNombre, colRol, colActivo, colAcciones);
 
-        VBox center = new VBox(10, topBar, tablaUsuarios);
+        // Botón cerrar en la parte inferior
+        Button btnCerrar = new Button("Cerrar");
+        btnCerrar.setOnAction(e -> ((Stage) getScene().getWindow()).close());
+        HBox bottomBar = new HBox(10);
+        bottomBar.setAlignment(Pos.CENTER_RIGHT);
+        bottomBar.setPadding(new Insets(10, 0, 0, 0));
+        bottomBar.getChildren().add(btnCerrar);
+
+        VBox center = new VBox(10, topBar, tablaUsuarios, bottomBar);
         setCenter(center);
     }
 
