@@ -8,23 +8,21 @@ import edu.observador.data.DataAccessException;
 import edu.observador.model.Estudiante;
 import edu.observador.view.controllers.Sesion;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import java.util.List;
 
-/**
- * Vista para generar y mostrar reportes generales de convivencia.
- * Solo visible para el coordinador.
- */
 public class ReportesView extends BorderPane {
 
     private final ObservacionController obsController;
     private final UsuarioController userController;
     private TextArea txtReporte;
-    private Button btnRefrescar, btnExportar;
+    private Button btnRefrescar, btnExportar, btnCerrar;
 
     public ReportesView() {
         this.obsController = new ObservacionController(MainApp.getDAO());
@@ -52,18 +50,26 @@ public class ReportesView extends BorderPane {
         txtReporte.setWrapText(true);
         txtReporte.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
 
-        VBox center = new VBox(10, topBar, txtReporte);
+        // Botón cerrar en la parte inferior
+        btnCerrar = new Button("Cerrar");
+        btnCerrar.setOnAction(e -> ((Stage) getScene().getWindow()).close());
+        HBox bottomBar = new HBox(10);
+        bottomBar.setAlignment(Pos.CENTER_RIGHT);
+        bottomBar.setPadding(new Insets(10, 0, 0, 0));
+        bottomBar.getChildren().add(btnCerrar);
+
+        VBox center = new VBox(10, topBar, txtReporte, bottomBar);
         setCenter(center);
     }
 
     private void cargarReporte() {
         try {
-            // Cargar todos los estudiantes con su historial completo
             List<Estudiante> estudiantes = userController.listarEstudiantes();
+            // Cargar historial de cada estudiante para el reporte
             for (Estudiante e : estudiantes) {
                 var historial = obsController.getHistorialEstudiante(e.getId(), false);
                 for (var o : historial) {
-                    e.agregarObservacion(o); // poblar historial en memoria para el reporte
+                    e.agregarObservacion(o); // poblar historial en memoria
                 }
             }
             String reporte = obsController.generarReporteGeneral(Sesion.getUsuarioActual());

@@ -14,9 +14,9 @@ import java.util.Objects;
  */
 public class Docente extends Usuario {
 
-    private String materia;                     // Materia que enseña (ej. "Matemáticas")
-    private List<String> cursosAsignados;       // Lista de cursos donde enseña (ej. ["11A", "9B"])
-    private String cursoDireccionGrupo;         // Curso que dirige como docente de grupo (ej. "11A")
+    private String materia;
+    private List<String> cursosAsignados;
+    private String cursoDireccionGrupo;
     private boolean esDocenteDeGrupo;
     private List<Observacion> observacionesCreadas;
 

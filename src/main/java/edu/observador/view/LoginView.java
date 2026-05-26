@@ -14,10 +14,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
-/**
- * Vista de inicio de sesión programática.
- * Permite al usuario autenticarse y maneja el cambio obligatorio de contraseña.
- */
 public class LoginView extends VBox {
 
     private TextField txtId;
@@ -35,7 +31,6 @@ public class LoginView extends VBox {
         setPadding(new Insets(20));
         setStyle("-fx-background-color: #f4f7fc;");
 
-        // Título
         Label titulo = new Label("EduObservador");
         titulo.setFont(Font.font("System", FontWeight.BOLD, 28));
         titulo.setStyle("-fx-text-fill: #2c3e50;");
@@ -44,7 +39,6 @@ public class LoginView extends VBox {
         subtitulo.setFont(Font.font("System", 16));
         subtitulo.setStyle("-fx-text-fill: #7f8c8d;");
 
-        // Formulario
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
@@ -102,7 +96,7 @@ public class LoginView extends VBox {
     }
 
     private void mostrarDialogoCambioContrasenia(Usuario usuario) {
-        // Primero, mostrar un mensaje informativo
+        // Ventana informativa primero
         Alert alertaInfo = new Alert(Alert.AlertType.INFORMATION);
         alertaInfo.setTitle("Cambio obligatorio de contraseña");
         alertaInfo.setHeaderText("Bienvenido, " + usuario.getNombre());
@@ -110,7 +104,6 @@ public class LoginView extends VBox {
                 + "La nueva contraseña debe tener al menos 4 caracteres.");
         alertaInfo.initOwner(getScene().getWindow());
 
-        // Cuando el usuario cierre la alerta, mostrar el diálogo para nueva contraseña
         alertaInfo.showAndWait().ifPresent(response -> {
             boolean cambioExitoso = false;
             while (!cambioExitoso) {
@@ -122,15 +115,12 @@ public class LoginView extends VBox {
 
                 String nuevaPass = dialog.showAndWait().orElse(null);
                 if (nuevaPass == null) {
-                    // Usuario canceló, no podemos continuar. Volvemos al login.
                     mostrarAlerta("Cancelado", "Debe cambiar la contraseña para acceder al sistema.", Alert.AlertType.WARNING);
-                    // Limpiar campos y mantener la pantalla de login
-                    return;
+                    return; // Regresa al login
                 }
                 if (nuevaPass.length() < 4) {
                     mostrarAlerta("Contraseña muy corta", "La contraseña debe tener al menos 4 caracteres.", Alert.AlertType.ERROR);
-                    // Repetir el bucle (seguir pidiendo)
-                    continue;
+                    continue; // Repite el diálogo
                 }
                 try {
                     authController.procesarCambioContraseniaObligatorio(nuevaPass);
@@ -139,7 +129,7 @@ public class LoginView extends VBox {
                     MainApp.cargarDashboard();
                 } catch (Exception e) {
                     mostrarAlerta("Error", "No se pudo cambiar la contraseña: " + e.getMessage(), Alert.AlertType.ERROR);
-                    // No salimos del bucle; permitimos reintentar
+                    // Se puede reintentar
                 }
             }
         });

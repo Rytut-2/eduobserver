@@ -8,19 +8,17 @@ import edu.observador.model.*;
 import edu.observador.view.controllers.Sesion;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
-/**
- * Vista para mostrar el historial de observaciones de un estudiante.
- * Permite filtrar por tipo (académicas/disciplinarias/todas) y,
- * si el usuario logueado es coordinador, anular observaciones.
- */
 public class HistorialView extends BorderPane {
 
     private final Estudiante estudiante;
@@ -31,6 +29,7 @@ public class HistorialView extends BorderPane {
     private ComboBox<String> cmbFiltro;
     private Label lblTitulo;
     private Button btnAnular;
+    private Button btnCerrar;
 
     public HistorialView(Estudiante estudiante) {
         this.estudiante = estudiante;
@@ -95,26 +94,81 @@ public class HistorialView extends BorderPane {
 
         tabla.getColumns().addAll(colFecha, colDescripcion, colTipo, colCreador, colEstado, colJustificacion);
 
-        VBox center = new VBox(10, lblTitulo, topBar, tabla);
+        // Botón cerrar
+        btnCerrar = new Button("Cerrar");
+        btnCerrar.setOnAction(e -> ((Stage) getScene().getWindow()).close());
+        HBox bottomBar = new HBox(10);
+        bottomBar.setAlignment(Pos.CENTER_RIGHT);
+        bottomBar.setPadding(new Insets(10, 0, 0, 0));
+        bottomBar.getChildren().add(btnCerrar);
+
+        VBox center = new VBox(10, lblTitulo, topBar, tabla, bottomBar);
         setCenter(center);
     }
 
     private void cargarHistorial() {
         try {
+            // Obtener todas las observaciones del estudiante (incluye anuladas)
             List<Observacion> todas = obsController.getHistorialEstudiante(estudiante.getId(), false);
-            String filtro = cmbFiltro.getValue();
-            List<Observacion> filtradas;
-            if ("Académicas".equals(filtro)) {
-                filtradas = todas.stream().filter(o -> o instanceof ObservacionAcademica).toList();
-            } else if ("Disciplinarias".equals(filtro)) {
-                filtradas = todas.stream().filter(o -> o instanceof ObservacionDisciplinaria).toList();
-            } else {
-                filtradas = todas;
+
+            // Filtrar según permisos del usuario logueado
+            List<Observacion> filtradasPorPermiso = aplicarFiltroPermisos(todas);
+
+            // Aplicar filtro adicional por tipo (académicas/disciplinarias)
+            String filtroTipo = cmbFiltro.getValue();
+            if ("Académicas".equals(filtroTipo)) {
+                filtradasPorPermiso = filtradasPorPermiso.stream()
+                        .filter(o -> o instanceof ObservacionAcademica)
+                        .collect(Collectors.toList());
+            } else if ("Disciplinarias".equals(filtroTipo)) {
+                filtradasPorPermiso = filtradasPorPermiso.stream()
+                        .filter(o -> o instanceof ObservacionDisciplinaria)
+                        .collect(Collectors.toList());
             }
-            tabla.setItems(FXCollections.observableArrayList(filtradas));
+
+            tabla.setItems(FXCollections.observableArrayList(filtradasPorPermiso));
+            if (filtradasPorPermiso.isEmpty()) {
+                tabla.setPlaceholder(new Label("No hay observaciones para mostrar con los filtros actuales."));
+            }
         } catch (DataAccessException e) {
             mostrarAlerta("Error", "No se pudo cargar el historial: " + e.getMessage(), Alert.AlertType.ERROR);
         }
+    }
+
+    /**
+     * Aplica las reglas de visibilidad según el rol del usuario logueado.
+     * - Coordinador: ve todas las observaciones.
+     * - Estudiante: ve todas sus observaciones (ya filtradas por estudiante).
+     * - Docente regular: solo observaciones que él mismo creó.
+     * - Docente de grupo: ve todas las observaciones de los estudiantes de su curso a cargo.
+     */
+    private List<Observacion> aplicarFiltroPermisos(List<Observacion> todas) {
+        if (usuarioActual instanceof Coordinador) {
+            return todas;
+        }
+        if (usuarioActual instanceof Estudiante) {
+            // El estudiante ya solo ve sus propias observaciones porque cargamos por estudianteId
+            return todas;
+        }
+        if (usuarioActual instanceof Docente) {
+            Docente docente = (Docente) usuarioActual;
+            if (docente.isEsDocenteDeGrupo()) {
+                // Docente de grupo: verifica si el estudiante pertenece a su curso a cargo
+                String cursoDir = docente.getCursoDireccionGrupo();
+                if (cursoDir != null && estudiante.getGrado().equals(cursoDir)) {
+                    return todas; // Ve todo el historial del estudiante
+                } else {
+                    // El estudiante no es de su grupo: no ve nada (o solo sus propias observaciones? por seguridad, ninguna)
+                    return List.of();
+                }
+            } else {
+                // Docente regular: solo observaciones creadas por él
+                return todas.stream()
+                        .filter(obs -> obs.getCreador().getId().equals(docente.getId()))
+                        .collect(Collectors.toList());
+            }
+        }
+        return List.of();
     }
 
     private void anularObservacion() {

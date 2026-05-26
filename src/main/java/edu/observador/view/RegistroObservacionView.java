@@ -9,15 +9,13 @@ import edu.observador.model.enums.NivelSeveridad;
 import edu.observador.model.enums.TipoAcademia;
 import edu.observador.view.controllers.Sesion;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-/**
- * Vista para registrar observaciones académicas o disciplinarias.
- * Se abre como diálogo modal desde el Dashboard.
- */
 public class RegistroObservacionView extends VBox {
 
     private ComboBox<Estudiante> cmbEstudiante;
@@ -28,6 +26,7 @@ public class RegistroObservacionView extends VBox {
     private TextField txtDetalle;
     private ComboBox<NivelSeveridad> cmbSeveridad;
     private Button btnGuardar;
+    private Button btnCancelar;
 
     private ObservacionController obsController;
     private UsuarioController userController;
@@ -43,15 +42,32 @@ public class RegistroObservacionView extends VBox {
         setPadding(new Insets(20));
         setStyle("-fx-background-color: white;");
 
-        // Estudiante
+        // Estudiante con visualización personalizada
         cmbEstudiante = new ComboBox<>();
         cargarEstudiantes();
         cmbEstudiante.setPromptText("Seleccione estudiante");
+        cmbEstudiante.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(Estudiante est, boolean empty) {
+                super.updateItem(est, empty);
+                if (empty || est == null) setText(null);
+                else setText(est.getNombreCompleto() + " - " + est.getGrado());
+            }
+        });
+        cmbEstudiante.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(Estudiante est, boolean empty) {
+                super.updateItem(est, empty);
+                if (empty || est == null) setText(null);
+                else setText(est.getNombreCompleto() + " - " + est.getGrado());
+            }
+        });
 
         // Descripción
         txtDescripcion = new TextArea();
         txtDescripcion.setPromptText("Descripción de la observación");
         txtDescripcion.setPrefRowCount(4);
+        txtDescripcion.setWrapText(true);
 
         // Tipo de observación
         rbAcademica = new RadioButton("Académica");
@@ -74,7 +90,8 @@ public class RegistroObservacionView extends VBox {
         cmbSeveridad.setPromptText("Severidad");
 
         btnGuardar = new Button("Guardar Observación");
-        btnGuardar.setOnAction(e -> guardar());
+        btnCancelar = new Button("Cancelar");
+        btnCancelar.setOnAction(e -> ((Stage) getScene().getWindow()).close());
 
         // Lógica de habilitación de campos según tipo
         rbAcademica.selectedProperty().addListener((obs, old, val) -> {
@@ -87,29 +104,57 @@ public class RegistroObservacionView extends VBox {
             cmbTipo.setDisable(val);
             txtDetalle.setDisable(val);
         });
-        // Inicialmente solo académica habilitada
-        cmbSeveridad.setDisable(true);
+        cmbSeveridad.setDisable(true); // inicial
 
-        // Organizar en GridPane
+        // Organizar en GridPane con mejor distribución
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
+        grid.setPadding(new Insets(10));
+
+        // Fila 0: Estudiante
         grid.add(new Label("Estudiante:"), 0, 0);
         grid.add(cmbEstudiante, 1, 0);
+        GridPane.setColumnSpan(cmbEstudiante, 2);
+
+        // Fila 1: Descripción
         grid.add(new Label("Descripción:"), 0, 1);
         grid.add(txtDescripcion, 1, 1);
+        GridPane.setColumnSpan(txtDescripcion, 2);
+
+        // Fila 2: Tipo
         grid.add(new Label("Tipo:"), 0, 2);
         grid.add(rbAcademica, 1, 2);
         grid.add(rbDisciplinaria, 2, 2);
+
+        // Fila 3: Detalle académico
         grid.add(new Label("Detalle académico:"), 0, 3);
         grid.add(txtDetalle, 1, 3);
+        GridPane.setColumnSpan(txtDetalle, 2);
+
+        // Fila 4: Tipo academia
         grid.add(new Label("Tipo academia:"), 0, 4);
         grid.add(cmbTipo, 1, 4);
+        GridPane.setColumnSpan(cmbTipo, 2);
+
+        // Fila 5: Severidad
         grid.add(new Label("Severidad:"), 0, 5);
         grid.add(cmbSeveridad, 1, 5);
-        grid.add(btnGuardar, 1, 6);
+        GridPane.setColumnSpan(cmbSeveridad, 2);
+
+        // Fila 6: Botones
+        HBox buttonBar = new HBox(10);
+        buttonBar.setAlignment(Pos.CENTER_RIGHT);
+        buttonBar.getChildren().addAll(btnGuardar, btnCancelar);
+        grid.add(buttonBar, 1, 6);
+
+        // Ancho de columnas
+        grid.getColumnConstraints().add(new javafx.scene.layout.ColumnConstraints(100));
+        grid.getColumnConstraints().add(new javafx.scene.layout.ColumnConstraints(200));
+        grid.getColumnConstraints().add(new javafx.scene.layout.ColumnConstraints(100));
 
         getChildren().add(grid);
+        btnGuardar.setOnAction(e -> guardar());
     }
 
     private void cargarEstudiantes() {
@@ -140,13 +185,7 @@ public class RegistroObservacionView extends VBox {
                     mostrarAlerta("Error", "Debe completar el tipo de academia y el detalle académico.", Alert.AlertType.ERROR);
                     return;
                 }
-                obsController.registrarAcademica(
-                        est.getId(),
-                        Sesion.getUsuarioActual().getId(),
-                        desc,
-                        tipo,
-                        detalle
-                );
+                obsController.registrarAcademica(est.getId(), Sesion.getUsuarioActual().getId(), desc, tipo, detalle);
                 mostrarAlerta("Éxito", "Observación académica registrada correctamente.", Alert.AlertType.INFORMATION);
             } else {
                 NivelSeveridad sev = cmbSeveridad.getValue();
@@ -154,15 +193,9 @@ public class RegistroObservacionView extends VBox {
                     mostrarAlerta("Error", "Debe seleccionar la severidad.", Alert.AlertType.ERROR);
                     return;
                 }
-                obsController.registrarDisciplinaria(
-                        est.getId(),
-                        Sesion.getUsuarioActual().getId(),
-                        desc,
-                        sev
-                );
+                obsController.registrarDisciplinaria(est.getId(), Sesion.getUsuarioActual().getId(), desc, sev);
                 mostrarAlerta("Éxito", "Observación disciplinaria registrada correctamente.", Alert.AlertType.INFORMATION);
             }
-            // Cerrar ventana después de guardar
             ((Stage) getScene().getWindow()).close();
         } catch (Exception ex) {
             mostrarAlerta("Error", "No se pudo registrar la observación: " + ex.getMessage(), Alert.AlertType.ERROR);
