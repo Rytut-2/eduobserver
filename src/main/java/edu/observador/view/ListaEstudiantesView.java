@@ -12,6 +12,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -21,20 +22,22 @@ import java.util.List;
 
 /**
  * Vista que muestra la lista de estudiantes asignados a los cursos del docente.
- * Permite ver el historial de observaciones de cada estudiante.
+ * Permite filtrar por curso y ver el historial de observaciones de cada estudiante.
  */
 public class ListaEstudiantesView extends BorderPane {
 
     private final Docente docente;
     private final UsuarioController userController;
     private TableView<Estudiante> tablaEstudiantes;
+    private ComboBox<String> cmbFiltroCurso;
     private Label lblTitulo;
+    private List<Estudiante> todosEstudiantes;
 
     public ListaEstudiantesView(Docente docente) {
         this.docente = docente;
         this.userController = new UsuarioController(MainApp.getDAO());
         inicializarUI();
-        cargarEstudiantes();
+        cargarDatos();
     }
 
     private void inicializarUI() {
@@ -43,6 +46,15 @@ public class ListaEstudiantesView extends BorderPane {
 
         lblTitulo = new Label("Estudiantes a cargo de " + docente.getNombreCompleto());
         lblTitulo.setStyle("-fx-font-size: 20px; -fx-font-weight: bold;");
+
+        // Filtro por curso
+        cmbFiltroCurso = new ComboBox<>();
+        cmbFiltroCurso.setPromptText("Filtrar por salón");
+        cmbFiltroCurso.setOnAction(e -> filtrarEstudiantes());
+
+        HBox topBar = new HBox(10);
+        topBar.setPadding(new Insets(0, 0, 10, 0));
+        topBar.getChildren().addAll(cmbFiltroCurso);
 
         // Tabla
         tablaEstudiantes = new TableView<>();
@@ -83,29 +95,50 @@ public class ListaEstudiantesView extends BorderPane {
 
         tablaEstudiantes.getColumns().addAll(colId, colNombre, colGrado, colAlerta, colAcciones);
 
-        VBox center = new VBox(10, lblTitulo, tablaEstudiantes);
+        VBox center = new VBox(10, lblTitulo, topBar, tablaEstudiantes);
         setCenter(center);
     }
 
-    private void cargarEstudiantes() {
+    private void cargarDatos() {
         try {
             List<String> cursosDocente = docente.getCursosAsignados();
             if (cursosDocente == null || cursosDocente.isEmpty()) {
                 mostrarAlerta("Información", "No tiene cursos asignados.", Alert.AlertType.INFORMATION);
                 tablaEstudiantes.setItems(FXCollections.observableArrayList());
+                cmbFiltroCurso.setDisable(true);
                 return;
             }
 
-            List<Estudiante> todosEstudiantes = new ArrayList<>();
+            // Cargar estudiantes de todos los cursos del docente
+            todosEstudiantes = new ArrayList<>();
             for (String curso : cursosDocente) {
                 List<Estudiante> estudiantesCurso = userController.listarEstudiantesPorGrado(curso);
                 todosEstudiantes.addAll(estudiantesCurso);
             }
-            // Eliminar duplicados (mismo estudiante puede estar en varios cursos del docente? No debería, pero por si acaso)
-            List<Estudiante> unicos = todosEstudiantes.stream().distinct().toList();
-            tablaEstudiantes.setItems(FXCollections.observableArrayList(unicos));
+            // Eliminar duplicados (por si un estudiante aparece en varios cursos del mismo docente)
+            todosEstudiantes = todosEstudiantes.stream().distinct().toList();
+
+            // Configurar combo de filtro con los cursos únicos
+            cmbFiltroCurso.getItems().clear();
+            cmbFiltroCurso.getItems().add("Todos");
+            cmbFiltroCurso.getItems().addAll(cursosDocente);
+            cmbFiltroCurso.setValue("Todos");
+
+            filtrarEstudiantes();
         } catch (DataAccessException e) {
             mostrarAlerta("Error", "No se pudieron cargar los estudiantes: " + e.getMessage(), Alert.AlertType.ERROR);
+        }
+    }
+
+    private void filtrarEstudiantes() {
+        String filtro = cmbFiltroCurso.getValue();
+        if (filtro == null || filtro.equals("Todos")) {
+            tablaEstudiantes.setItems(FXCollections.observableArrayList(todosEstudiantes));
+        } else {
+            List<Estudiante> filtrados = todosEstudiantes.stream()
+                    .filter(e -> e.getGrado().equals(filtro))
+                    .toList();
+            tablaEstudiantes.setItems(FXCollections.observableArrayList(filtrados));
         }
     }
 
@@ -114,7 +147,7 @@ public class ListaEstudiantesView extends BorderPane {
         stage.initModality(Modality.WINDOW_MODAL);
         stage.setTitle("Historial de " + estudiante.getNombreCompleto());
         HistorialView historial = new HistorialView(estudiante);
-        stage.setScene(new Scene(historial, 900, 600));
+        stage.setScene(new Scene(historial, 1000, 700));
         stage.initOwner(getScene().getWindow());
         stage.show();
     }
