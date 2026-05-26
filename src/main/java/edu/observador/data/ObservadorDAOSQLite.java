@@ -133,9 +133,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, id);
             ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return mapearUsuario(rs);
-            }
+            if (rs.next()) return mapearUsuario(rs);
             return null;
         } catch (SQLException e) {
             throw new DataAccessException("Error buscando usuario: " + id, e);
@@ -149,9 +147,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, rol.name());
             ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                usuarios.add(mapearUsuario(rs));
-            }
+            while (rs.next()) usuarios.add(mapearUsuario(rs));
         } catch (SQLException e) {
             throw new DataAccessException("Error listando usuarios por rol: " + rol, e);
         }
@@ -237,9 +233,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, estudianteId);
             ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                observaciones.add(mapearObservacion(rs));
-            }
+            while (rs.next()) observaciones.add(mapearObservacion(rs));
         } catch (SQLException e) {
             throw new DataAccessException("Error cargando historial del estudiante: " + estudianteId, e);
         }
@@ -297,9 +291,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, estado.name());
             ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                peticiones.add(mapearPeticion(rs));
-            }
+            while (rs.next()) peticiones.add(mapearPeticion(rs));
         } catch (SQLException e) {
             throw new DataAccessException("Error listando peticiones por estado", e);
         }
@@ -317,9 +309,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         try (PreparedStatement pstmt = conexionDB.obtenerConexion().prepareStatement(sql)) {
             pstmt.setString(1, estudianteId);
             ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                peticiones.add(mapearPeticion(rs));
-            }
+            while (rs.next()) peticiones.add(mapearPeticion(rs));
         } catch (SQLException e) {
             throw new DataAccessException("Error listando peticiones por estudiante", e);
         }
@@ -343,7 +333,7 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         conexionDB.cerrar();
     }
 
-    // ==================== Métodos auxiliares de mapeo ====================
+    // ==================== Mapeadores auxiliares ====================
 
     private Usuario mapearUsuario(ResultSet rs) throws SQLException {
         String id = rs.getString("id");
@@ -366,8 +356,9 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
             String materia = rs.getString("materia");
             String cursosStr = rs.getString("cursos_asignados");
             List<String> cursos = new ArrayList<>();
-            if (cursosStr != null && !cursosStr.isEmpty())
-                cursos = List.of(cursosStr.split(","));
+            if (cursosStr != null && !cursosStr.isEmpty()) {
+                for (String c : cursosStr.split(",")) cursos.add(c.trim());
+            }
             String cursoDireccion = rs.getString("curso_direccion_grupo");
             boolean esDocenteGrupo = rs.getInt("es_docente_grupo") == 1;
             Docente doc = new Docente(id, nombre, apellido, contrasenia);
@@ -420,15 +411,8 @@ public class ObservadorDAOSQLite implements ObservadorDAO {
         String motivo = rs.getString("motivo");
         LocalDate fecha = LocalDate.parse(rs.getString("fecha_peticion"));
         EstadoPeticion estado = EstadoPeticion.valueOf(rs.getString("estado"));
-
-        Observacion observacion = buscarObservacionPorId(observacionId);
-        if (observacion == null)
-            throw new DataAccessException("Observación no encontrada para petición " + id);
-
-        // Usar el constructor completo (asumiendo que existe en PeticionRevision, si no, crearlo)
-        // Si la clase no tiene constructor con fecha y estado, se puede usar reflexión o setters.
-        // Aquí suponemos que existe un constructor con todos los parámetros.
-        // Si no, descomenta el bloque alternativo.
-        return new PeticionRevision(id, observacion, motivo, fecha, estado);
+        Observacion obs = buscarObservacionPorId(observacionId);
+        if (obs == null) throw new DataAccessException("Observación no encontrada para petición " + id);
+        return new PeticionRevision(id, obs, motivo, fecha, estado);
     }
 }
